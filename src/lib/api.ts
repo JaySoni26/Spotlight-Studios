@@ -27,6 +27,10 @@ export const api = {
   deleteStudent: (id: string, data: { code: string; refund_amount: number }) =>
     request(`/api/students/${id}`, { method: "DELETE", body: JSON.stringify(data) }),
   renewStudent: (id: string, data: any) => request(`/api/students/${id}/renew`, { method: "POST", body: JSON.stringify(data) }),
+  extendTrial: (id: string, data: { additional_days: number }) =>
+    request(`/api/students/${id}/trial/extend`, { method: "POST", body: JSON.stringify(data) }),
+  convertTrialToPaid: (id: string, data: { amount: number; validity_days: number; start_date: string }) =>
+    request(`/api/students/${id}/convert`, { method: "POST", body: JSON.stringify(data) }),
   recordStudentLeave: (id: string, data: { leave_days: number; transfer_days?: number; notes?: string | null }) =>
     request(`/api/students/${id}/leave`, { method: "POST", body: JSON.stringify(data) }),
   updateStudentLeave: (studentId: string, leaveId: string, data: { leave_days: number; transfer_days: number; notes?: string | null }) =>

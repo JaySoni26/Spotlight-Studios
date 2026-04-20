@@ -8,8 +8,9 @@ import { Separator } from "@/components/ui/separator";
 import { Avatar } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
-import { cn, digitsOnlyPhone, fmtDate, formatINMobileDisplay, fmtINR, getInitials, getStatus } from "@/lib/utils";
-import { ArrowRightLeft, CalendarCheck, Pencil, Trash2, Phone, CalendarOff } from "lucide-react";
+import { cn, digitsOnlyPhone, fmtDate, formatINMobileDisplay, fmtINR, getInitials, getStatus, isTrialStudent } from "@/lib/utils";
+import { batchAccentColor, trialEnrollmentChipStyles } from "@/lib/chart-palette";
+import { ArrowRightLeft, CalendarCheck, CalendarPlus, Pencil, Trash2, Phone } from "lucide-react";
 import { LeaveHistoryList } from "@/components/student-leave-dialog";
 import { StudentDetailSkeleton } from "@/components/detail-sheet-skeleton";
 
@@ -32,10 +33,12 @@ interface StudentDetailDialogProps {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   studentId: string | null;
+  batches?: { id: string }[];
   onEdit: (s: any) => void;
   onRenew: (s: any) => void;
+  onExtendTrial?: (s: any) => void;
+  onConvertToPaid?: (s: any) => void;
   onBatchChange: (s: any) => void;
-  onLeave: (s: any) => void;
   onDelete: (s: any) => void;
 }
 
@@ -43,10 +46,12 @@ export function StudentDetailDialog({
   open,
   onOpenChange,
   studentId,
+  batches = [],
   onEdit,
   onRenew,
+  onExtendTrial,
+  onConvertToPaid,
   onBatchChange,
-  onLeave,
   onDelete,
 }: StudentDetailDialogProps) {
   const [student, setStudent] = React.useState<any>(null);
@@ -76,6 +81,7 @@ export function StudentDetailDialog({
   if (!studentId) return null;
   const status = student ? getStatus(student.end_date) : null;
   const showSkeleton = loading || !student;
+  const accent = student ? batchAccentColor(student.batch_id, batches) : "hsl(var(--primary))";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -91,7 +97,14 @@ export function StudentDetailDialog({
               {showSkeleton ? (
                 <Skeleton className="h-14 w-14 shrink-0 rounded-2xl" />
               ) : (
-                <Avatar className="h-14 w-14 shrink-0 rounded-2xl bg-primary/12 text-base font-semibold text-primary">
+                <Avatar
+                  className="h-14 w-14 shrink-0 rounded-2xl border-2 text-base font-semibold shadow-inner"
+                  style={{
+                    borderColor: `color-mix(in srgb, ${accent} 50%, hsl(var(--border)))`,
+                    backgroundColor: `color-mix(in srgb, ${accent} 16%, hsl(var(--muted) / 0.45))`,
+                    color: accent,
+                  }}
+                >
                   {getInitials(student.name)}
                 </Avatar>
               )}
@@ -122,6 +135,14 @@ export function StudentDetailDialog({
           ) : (
             <div className="space-y-5 text-sm">
               <div className="flex flex-wrap items-center gap-2">
+                {isTrialStudent(student) ? (
+                  <span
+                    className="rounded-md border px-2 py-0.5 text-xs font-semibold"
+                    style={trialEnrollmentChipStyles(student.batch_id, batches)}
+                  >
+                    Trial
+                  </span>
+                ) : null}
                 {status && <Badge variant={statusBadgeVariant(status)}>{status.label}</Badge>}
                 {student.batch_name ? (
                   <Badge variant="outline">{student.batch_name}</Badge>
@@ -136,10 +157,23 @@ export function StudentDetailDialog({
               )}
               <Separator className="bg-border/60" />
               <div className="grid grid-cols-2 gap-x-4 gap-y-5">
-                <Stat label="Amount paid">₹{fmtINR(student.amount)}</Stat>
-                <Stat label="Validity">{student.validity_days} days</Stat>
-                <Stat label="Start">{fmtDate(student.start_date)}</Stat>
-                <Stat label="Ends">{fmtDate(student.end_date)}</Stat>
+                <div className="col-span-2 rounded-xl border border-border/50 bg-muted/15 px-3.5 py-3 dark:bg-muted/10">
+                  <Stat label={isTrialStudent(student) ? "Fees recorded (trial)" : "Total paid to date"}>
+                    ₹{fmtINR(student.amount)}
+                  </Stat>
+                  <p className="mt-2 text-[12px] leading-snug text-muted-foreground">
+                    {isTrialStudent(student)
+                      ? "Trials stay at ₹0 until you convert to paid. Then payments and renewals add here."
+                      : "Running total — initial fee plus every renewal you record."}
+                  </p>
+                </div>
+                <Stat label={isTrialStudent(student) ? "Trial length (days)" : "Validity"}>
+                  {student.validity_days} days
+                </Stat>
+                <Stat label={isTrialStudent(student) ? "Trial started" : "Start"}>{fmtDate(student.start_date)}</Stat>
+                <div className="col-span-2">
+                  <Stat label={isTrialStudent(student) ? "Trial ends" : "Ends"}>{fmtDate(student.end_date)}</Stat>
+                </div>
               </div>
               {student.notes && (
                 <div className="rounded-xl border border-border/50 bg-muted/20 px-3.5 py-3">
@@ -171,7 +205,40 @@ export function StudentDetailDialog({
               <>
                 <div className="space-y-2">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Membership</p>
-                  <div className="grid grid-cols-2 gap-2">
+                  {isTrialStudent(student) ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      {onExtendTrial ? (
+                        <Button
+                          variant="secondary"
+                          className={cn(
+                            "h-11 w-full justify-center gap-2 rounded-full font-semibold",
+                            !onConvertToPaid && "col-span-2",
+                          )}
+                          onClick={() => {
+                            onExtendTrial(student);
+                            onOpenChange(false);
+                          }}
+                        >
+                          <CalendarPlus className="h-4 w-4 shrink-0" /> Extend trial
+                        </Button>
+                      ) : null}
+                      {onConvertToPaid ? (
+                        <Button
+                          variant="default"
+                          className={cn(
+                            "h-11 w-full justify-center gap-2 rounded-full font-semibold",
+                            !onExtendTrial && "col-span-2",
+                          )}
+                          onClick={() => {
+                            onConvertToPaid(student);
+                            onOpenChange(false);
+                          }}
+                        >
+                          <CalendarCheck className="h-4 w-4 shrink-0" /> Convert to paid
+                        </Button>
+                      ) : null}
+                    </div>
+                  ) : (
                     <Button
                       variant="default"
                       className="h-11 w-full justify-center gap-2 rounded-full font-semibold"
@@ -182,17 +249,7 @@ export function StudentDetailDialog({
                     >
                       <CalendarCheck className="h-4 w-4 shrink-0" /> Renew
                     </Button>
-                    <Button
-                      variant="secondary"
-                      className="h-11 w-full justify-center gap-2 rounded-full font-semibold"
-                      onClick={() => {
-                        onLeave(student);
-                        onOpenChange(false);
-                      }}
-                    >
-                      <CalendarOff className="h-4 w-4 shrink-0" /> Leave
-                    </Button>
-                  </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Record</p>
@@ -232,9 +289,6 @@ export function StudentDetailDialog({
               </>
             )
           )}
-          <Button variant="ghost" className="h-10 w-full rounded-full text-[15px] text-muted-foreground" onClick={() => onOpenChange(false)}>
-            Close
-          </Button>
         </div>
       </DialogContent>
     </Dialog>

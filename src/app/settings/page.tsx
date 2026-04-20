@@ -11,13 +11,16 @@ import { Spinner } from "@/components/ui/spinner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useTheme } from "@/components/theme-provider";
-import { Shield, Palette, Percent, Save } from "lucide-react";
+import { Shield, Palette, Percent, Save, LogOut } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 const shell = "mx-auto w-full max-w-2xl space-y-8 pb-10";
 
 export default function SettingsPage() {
+  const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [loading, setLoading] = React.useState(true);
+  const [loggingOut, setLoggingOut] = React.useState(false);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
   const [deleteCode, setDeleteCode] = React.useState("");
@@ -62,6 +65,20 @@ export default function SettingsPage() {
       toast.error(e.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const logout = async () => {
+    setLoggingOut(true);
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+      toast.success("Signed out");
+      router.replace("/login");
+      router.refresh();
+    } catch {
+      toast.error("Could not sign out");
+    } finally {
+      setLoggingOut(false);
     }
   };
 
@@ -154,9 +171,10 @@ export default function SettingsPage() {
               <Shield className="h-5 w-5 text-foreground" strokeWidth={2} />
             </span>
             <div className="min-w-0 space-y-1">
-              <CardTitle className="text-lg font-semibold tracking-tight sm:text-xl">Delete protection</CardTitle>
+              <CardTitle className="text-lg font-semibold tracking-tight sm:text-xl">Studio code</CardTitle>
               <CardDescription className="text-[15px] leading-relaxed">
-                Required before removing students or batches. Pick something stronger than the default in production.
+                Sign in to Spotlight and confirm deletes (students / batches). Default is <strong className="font-semibold text-foreground">0000</strong>{" "}
+                until you change it — use something stronger in production.
               </CardDescription>
             </div>
           </div>
@@ -164,7 +182,7 @@ export default function SettingsPage() {
         <CardContent className="px-5 pb-6 sm:px-8 sm:pb-8">
           <div className="space-y-2">
             <Label htmlFor="delete-code" variant="form">
-              Special code
+              Access code
             </Label>
             <Input
               id="delete-code"
@@ -173,7 +191,9 @@ export default function SettingsPage() {
               placeholder="Minimum 4 characters"
               className="text-base sm:text-sm"
             />
-            <p className="text-[13px] leading-relaxed text-muted-foreground">Default is often 0000 until you change it here.</p>
+            <p className="text-[13px] leading-relaxed text-muted-foreground">
+              This is the code on the login screen and when deleting data.
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -227,6 +247,34 @@ export default function SettingsPage() {
               )}
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="plain overflow-hidden rounded-2xl border-border/55 shadow-sm">
+        <CardHeader className="space-y-3 p-5 sm:p-8 sm:pb-5">
+          <CardTitle className="text-lg font-semibold tracking-tight sm:text-xl">Session</CardTitle>
+          <CardDescription className="text-[15px] leading-relaxed">
+            Sign out on this browser. You will need the access code again to open Spotlight.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="px-5 pb-6 sm:px-8 sm:pb-8">
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11 gap-2 rounded-full border-border/70 font-semibold"
+            onClick={() => void logout()}
+            disabled={loggingOut}
+          >
+            {loggingOut ? (
+              <>
+                <Spinner className="h-4 w-4" /> Signing out…
+              </>
+            ) : (
+              <>
+                <LogOut className="h-4 w-4" /> Sign out
+              </>
+            )}
+          </Button>
         </CardContent>
       </Card>
     </div>

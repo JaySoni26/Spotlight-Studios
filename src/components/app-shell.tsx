@@ -61,12 +61,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [scrolled, setScrolled] = React.useState(false);
   const [createOpen, setCreateOpen] = React.useState(false);
 
+  const isLogin = pathname === "/login";
+
   React.useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  if (isLogin) {
+    return <div className="min-h-screen bg-background">{children}</div>;
+  }
 
   return (
     <div className="min-h-screen bg-background">

@@ -15,14 +15,37 @@ export const BatchInput = z.object({
   description: z.string().max(500).optional().nullable(),
 });
 
-export const StudentInput = z.object({
-  name: z.string().min(1, "Name is required").max(100),
-  phone: z.string().max(30).optional().nullable(),
-  amount: z.coerce.number().int().nonnegative(),
-  start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date"),
+export const StudentInput = z
+  .object({
+    name: z.string().min(1, "Name is required").max(100),
+    phone: z.string().max(30).optional().nullable(),
+    amount: z.coerce.number().int().nonnegative(),
+    start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date"),
+    validity_days: z.coerce.number().int().positive().max(3650),
+    batch_id: z.string().nullable().optional(),
+    notes: z.string().max(500).optional().nullable(),
+    enrollment_kind: z.enum(["paid", "trial"]).optional().default("paid"),
+  })
+  .superRefine((val, ctx) => {
+    if (val.enrollment_kind === "trial") {
+      if (val.validity_days > 120) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Trial period: at most 120 days",
+          path: ["validity_days"],
+        });
+      }
+    }
+  });
+
+export const ConvertTrialInput = z.object({
+  amount: z.coerce.number().int().positive(),
   validity_days: z.coerce.number().int().positive().max(3650),
-  batch_id: z.string().nullable().optional(),
-  notes: z.string().max(500).optional().nullable(),
+  start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date"),
+});
+
+export const TrialExtendInput = z.object({
+  additional_days: z.coerce.number().int().positive().max(365),
 });
 
 export const BatchChangeInput = z.object({

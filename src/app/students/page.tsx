@@ -2,7 +2,7 @@
 import * as React from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Search, MoreHorizontal, UserPlus, Filter, X, Phone, ArrowRightLeft, CalendarCheck, CalendarOff, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, MoreHorizontal, UserPlus, Filter, X, Phone, ArrowRightLeft, CalendarCheck, CalendarPlus, CalendarOff, Pencil, Trash2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,9 +19,10 @@ import { RenewDialog } from "@/components/renew-dialog";
 import { DeleteGuardDialog } from "@/components/delete-guard-dialog";
 import { StudentDetailDialog } from "@/components/student-detail-dialog";
 import { StudentLeaveDialog } from "@/components/student-leave-dialog";
+import { ConvertToPaidDialog, TrialExtendDialog } from "@/components/trial-enrolment-dialogs";
 import { api } from "@/lib/api";
-import { digitsOnlyPhone, fmtDate, fmtINR, formatINMobileDisplay, getInitials, getStatus } from "@/lib/utils";
-import { seriesColor } from "@/lib/chart-palette";
+import { digitsOnlyPhone, fmtDate, fmtINR, formatINMobileDisplay, getInitials, getStatus, studentRefundBreakdown } from "@/lib/utils";
+import { batchAccentColor, trialEnrollmentChipStyles } from "@/lib/chart-palette";
 
 function statusBadge(status: { key: string; label: string }) {
   const variantMap: Record<string, any> = {
@@ -54,6 +55,8 @@ function StudentsPageInner() {
   const [studentDetailId, setStudentDetailId] = React.useState<string | null>(null);
   const [leaveOpen, setLeaveOpen] = React.useState(false);
   const [leaveStudent, setLeaveStudent] = React.useState<any | null>(null);
+  const [trialExtendStudent, setTrialExtendStudent] = React.useState<any | null>(null);
+  const [convertTrialStudent, setConvertTrialStudent] = React.useState<any | null>(null);
 
   const load = React.useCallback(() => {
     setLoading(true);
@@ -72,6 +75,21 @@ function StudentsPageInner() {
   }, []);
 
   React.useEffect(() => { load(); }, [load]);
+
+  const spStudent = searchParams.get("student");
+  React.useEffect(() => {
+    if (spStudent) setStudentDetailId(spStudent);
+  }, [spStudent]);
+
+  const spStatus = searchParams.get("status");
+  React.useEffect(() => {
+    if (!spStatus) return;
+    if (spStatus === "expiring_soon") setStatusFilter("expiring_soon");
+    else if (spStatus === "trial") setStatusFilter("trial");
+    else if (spStatus === "active") setStatusFilter("active");
+    else if (spStatus === "critical") setStatusFilter("critical");
+    else if (spStatus === "expired") setStatusFilter("expired");
+  }, [spStatus]);
 
   const spAdd = searchParams.get("add");
   React.useEffect(() => {
@@ -102,8 +120,17 @@ function StudentsPageInner() {
           if (batchFilter !== "none" && s.batch_id !== batchFilter) return false;
         }
         if (statusFilter !== "all") {
-          if (statusFilter === "expiring_soon" && !(s.status.key === "critical" || s.status.key === "expiring")) return false;
-          if (statusFilter !== "expiring_soon" && s.status.key !== statusFilter) return false;
+          if (statusFilter === "trial") {
+            if ((s.enrollment_kind || "paid") !== "trial") return false;
+          } else if (statusFilter === "expiring_soon" && !(s.status.key === "critical" || s.status.key === "expiring")) {
+            return false;
+          } else if (
+            statusFilter !== "expiring_soon" &&
+            statusFilter !== "trial" &&
+            s.status.key !== statusFilter
+          ) {
+            return false;
+          }
         }
         return true;
       })
@@ -111,6 +138,11 @@ function StudentsPageInner() {
   }, [students, query, batchFilter, statusFilter]);
 
   const activeFilters = (batchFilter !== "all" ? 1 : 0) + (statusFilter !== "all" ? 1 : 0);
+
+  const deleteRefundInfo = React.useMemo(() => {
+    if (!deleteStudent) return null;
+    return studentRefundBreakdown(deleteStudent);
+  }, [deleteStudent]);
 
   const openAdd = () => {
     if (batches.length === 0) {
@@ -233,6 +265,7 @@ function StudentsPageInner() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All status</SelectItem>
+                <SelectItem value="trial">Trial</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
                 <SelectItem value="expiring_soon">Expiring soon</SelectItem>
                 <SelectItem value="critical">Critical (≤3d)</SelectItem>
@@ -307,7 +340,7 @@ function StudentsPageInner() {
                   <TableHead>Student</TableHead>
                   <TableHead>Phone</TableHead>
                   <TableHead>Batch</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead className="text-right">Total paid</TableHead>
                   <TableHead>Start</TableHead>
                   <TableHead>Ends</TableHead>
                   <TableHead>Status</TableHead>
@@ -315,7 +348,9 @@ function StudentsPageInner() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((s) => (
+                {filtered.map((s) => {
+                  const ac = batchAccentColor(s.batch_id, batches);
+                  return (
                   <TableRow
                     key={s.id}
                     className="cursor-pointer hover:bg-muted/40"
@@ -323,7 +358,16 @@ function StudentsPageInner() {
                   >
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <Avatar className="bg-primary/10 text-primary">{getInitials(s.name)}</Avatar>
+                        <Avatar
+                          className="border-2 font-semibold shadow-inner"
+                          style={{
+                            borderColor: `color-mix(in srgb, ${ac} 50%, hsl(var(--border)))`,
+                            backgroundColor: `color-mix(in srgb, ${ac} 16%, hsl(var(--muted) / 0.5))`,
+                            color: ac,
+                          }}
+                        >
+                          {getInitials(s.name)}
+                        </Avatar>
                         <div>
                           <p className="font-medium">{s.name}</p>
                           {s.notes && <p className="text-[11px] text-muted-foreground truncate max-w-[200px]">{s.notes}</p>}
@@ -343,7 +387,19 @@ function StudentsPageInner() {
                     <TableCell className="font-semibold text-primary text-right">₹{fmtINR(s.amount)}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{fmtDate(s.start_date)}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{fmtDate(s.end_date)}</TableCell>
-                    <TableCell>{statusBadge(s.status)}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap items-center gap-1">
+                        {(s.enrollment_kind || "paid") === "trial" ? (
+                          <span
+                            className="inline-flex shrink-0 rounded border px-1.5 py-px text-[10px] font-semibold"
+                            style={trialEnrollmentChipStyles(s.batch_id, batches)}
+                          >
+                            Trial
+                          </span>
+                        ) : null}
+                        {statusBadge(s.status)}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <StudentActions
                         student={s}
@@ -352,19 +408,22 @@ function StudentsPageInner() {
                         onRenew={openRenew}
                         onLeave={openLeave}
                         onDelete={openDelete}
+                        onExtendTrial={(st: any) => setTrialExtendStudent(st)}
+                        onConvertToPaid={(st: any) => setConvertTrialStudent(st)}
                         stopRowClick
                       />
                     </TableCell>
                   </TableRow>
-                ))}
+                );
+                })}
               </TableBody>
             </Table>
           </Card>
 
           {/* Mobile cards */}
           <div className="md:hidden space-y-4">
-            {filtered.map((s, idx) => {
-              const c = seriesColor(idx);
+            {filtered.map((s) => {
+              const c = batchAccentColor(s.batch_id, batches);
               const phoneDisp = s.phone ? formatINMobileDisplay(digitsOnlyPhone(String(s.phone))) : "";
               return (
                 <article
@@ -389,7 +448,14 @@ function StudentsPageInner() {
                   />
                   <div className="space-y-3 p-4">
                     <div className="flex items-start gap-3">
-                      <Avatar className="h-12 w-12 shrink-0 rounded-2xl border border-border/40 bg-primary/10 text-sm font-semibold text-primary shadow-inner">
+                      <Avatar
+                        className="h-12 w-12 shrink-0 rounded-2xl border-2 text-sm font-semibold shadow-inner"
+                        style={{
+                          borderColor: `color-mix(in srgb, ${c} 48%, hsl(var(--border)))`,
+                          backgroundColor: `color-mix(in srgb, ${c} 14%, hsl(var(--muted) / 0.45))`,
+                          color: c,
+                        }}
+                      >
                         {getInitials(s.name)}
                       </Avatar>
                       <div className="min-w-0 flex-1">
@@ -405,7 +471,17 @@ function StudentsPageInner() {
                             ) : null}
                           </div>
                           <div className="flex shrink-0 items-start gap-2">
-                            <div className="scale-90 origin-top-right [&_.rounded-full]:shadow-sm">{statusBadge(s.status)}</div>
+                            <div className="flex scale-90 origin-top-right flex-wrap items-center gap-1 [&_.rounded-full]:shadow-sm">
+                              {(s.enrollment_kind || "paid") === "trial" ? (
+                                <span
+                                  className="inline-flex shrink-0 rounded border px-1.5 py-px text-[10px] font-semibold"
+                                  style={trialEnrollmentChipStyles(s.batch_id, batches)}
+                                >
+                                  Trial
+                                </span>
+                              ) : null}
+                              {statusBadge(s.status)}
+                            </div>
                             <StudentActions
                               student={s}
                               onEdit={openEdit}
@@ -413,6 +489,8 @@ function StudentsPageInner() {
                               onRenew={openRenew}
                               onLeave={openLeave}
                               onDelete={openDelete}
+                              onExtendTrial={(st: any) => setTrialExtendStudent(st)}
+                              onConvertToPaid={(st: any) => setConvertTrialStudent(st)}
                               stopRowClick
                             />
                           </div>
@@ -429,7 +507,16 @@ function StudentsPageInner() {
                           )}
                         </div>
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border/50 pt-3 text-[13px] text-muted-foreground">
-                          <span className="font-medium tabular-nums text-primary">₹{fmtINR(s.amount)}</span>
+                          <span
+                            className="font-medium tabular-nums"
+                            style={
+                              (s.enrollment_kind || "paid") === "trial"
+                                ? { color: batchAccentColor(s.batch_id, batches) }
+                                : undefined
+                            }
+                          >
+                            {(s.enrollment_kind || "paid") === "trial" ? "Trial" : `₹${fmtINR(s.amount)}`}
+                          </span>
                           <span className="text-border" aria-hidden>
                             ·
                           </span>
@@ -471,13 +558,38 @@ function StudentsPageInner() {
       />
       <StudentDetailDialog
         open={!!studentDetailId}
-        onOpenChange={(v) => { if (!v) setStudentDetailId(null); }}
+        onOpenChange={(v) => {
+          if (!v) {
+            setStudentDetailId(null);
+            const sp = new URLSearchParams(searchParams.toString());
+            if (sp.has("student")) {
+              sp.delete("student");
+              const q = sp.toString();
+              router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
+            }
+          }
+        }}
         studentId={studentDetailId}
+        batches={batches}
         onEdit={(st) => openEdit(st)}
         onRenew={(st) => openRenew(st)}
+        onExtendTrial={(st) => setTrialExtendStudent(st)}
+        onConvertToPaid={(st) => setConvertTrialStudent(st)}
         onBatchChange={(st) => openBatchChange(st)}
-        onLeave={(st) => openLeave(st)}
         onDelete={(st) => openDelete(st)}
+      />
+      <TrialExtendDialog
+        open={!!trialExtendStudent}
+        onOpenChange={(v) => { if (!v) setTrialExtendStudent(null); }}
+        student={trialExtendStudent}
+        onSaved={load}
+      />
+      <ConvertToPaidDialog
+        open={!!convertTrialStudent}
+        onOpenChange={(v) => { if (!v) setConvertTrialStudent(null); }}
+        student={convertTrialStudent}
+        batches={batches}
+        onSaved={load}
       />
       <StudentLeaveDialog
         open={leaveOpen}
@@ -492,9 +604,42 @@ function StudentsPageInner() {
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         title="Delete student?"
-        description={deleteStudent ? `This will permanently remove ${deleteStudent.name}. Enter refund and special code to continue.` : ""}
+        description={deleteStudent ? `This will permanently remove ${deleteStudent.name}. Confirm refund amount and enter the special code.` : ""}
         confirmLabel="Delete"
         requireRefund
+        defaultRefundAmount={deleteRefundInfo?.suggestedRefund}
+        refundContext={
+          deleteStudent && deleteRefundInfo ? (
+            <div className="space-y-4 rounded-xl border border-border/60 bg-muted/30 p-4 dark:bg-muted/15">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Membership snapshot</p>
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px] tabular-nums">
+                <dt className="text-muted-foreground leading-snug">This cycle (from start date)</dt>
+                <dd className="text-right">
+                  <span className="block font-semibold text-foreground">₹{fmtINR(deleteRefundInfo.amountThisCycle)}</span>
+                  <span className="mt-0.5 block text-[11px] font-normal leading-snug text-muted-foreground">
+                    {deleteRefundInfo.cycleRangeLabel}
+                    {deleteRefundInfo.daysInCycleWindow > 0 ? (
+                      <span className="mt-0.5 block text-[10px] text-muted-foreground/90">
+                        Fee allocated to this {deleteRefundInfo.daysInCycleWindow}-day window (total ÷ validity × days in
+                        window).
+                      </span>
+                    ) : null}
+                  </span>
+                </dd>
+                <dt className="text-muted-foreground leading-snug">Days used</dt>
+                <dd className="text-right font-semibold text-foreground">
+                  {deleteRefundInfo.daysUsed} / {deleteRefundInfo.validity_days} days
+                </dd>
+                <dt className="text-muted-foreground leading-snug">Fee consumed</dt>
+                <dd className="text-right font-semibold text-foreground">₹{fmtINR(deleteRefundInfo.consumedValue)}</dd>
+              </dl>
+              <p className="border-t border-border/50 pt-4 text-[12px] leading-relaxed text-muted-foreground">
+                Fee is spread over full validity; each cycle is 30 days from their start date. Refund defaults to the unused
+                balance.
+              </p>
+            </div>
+          ) : null
+        }
         onConfirm={handleDelete}
       />
     </div>
@@ -525,7 +670,18 @@ export default function StudentsPage() {
   );
 }
 
-function StudentActions({ student, onEdit, onBatchChange, onRenew, onLeave, onDelete, stopRowClick }: any) {
+function StudentActions({
+  student,
+  onEdit,
+  onBatchChange,
+  onRenew,
+  onLeave,
+  onDelete,
+  onExtendTrial,
+  onConvertToPaid,
+  stopRowClick,
+}: any) {
+  const isTrial = (student.enrollment_kind || "paid") === "trial";
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -538,10 +694,22 @@ function StudentActions({ student, onEdit, onBatchChange, onRenew, onLeave, onDe
           <MoreHorizontal className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48" onClick={stopRowClick ? (e) => e.stopPropagation() : undefined}>
-        <DropdownMenuItem onClick={() => onRenew(student)}>
-          <CalendarCheck className="h-4 w-4" /> Renew membership
-        </DropdownMenuItem>
+      <DropdownMenuContent align="end" className="w-52" onClick={stopRowClick ? (e) => e.stopPropagation() : undefined}>
+        {!isTrial ? (
+          <DropdownMenuItem onClick={() => onRenew(student)}>
+            <CalendarCheck className="h-4 w-4" /> Renew membership
+          </DropdownMenuItem>
+        ) : null}
+        {isTrial && onConvertToPaid ? (
+          <DropdownMenuItem onClick={() => onConvertToPaid(student)}>
+            <CalendarCheck className="h-4 w-4" /> Convert to paid
+          </DropdownMenuItem>
+        ) : null}
+        {isTrial && onExtendTrial ? (
+          <DropdownMenuItem onClick={() => onExtendTrial(student)}>
+            <CalendarPlus className="h-4 w-4" /> Extend trial
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuItem onClick={() => onLeave(student)}>
           <CalendarOff className="h-4 w-4" /> Record leave
         </DropdownMenuItem>

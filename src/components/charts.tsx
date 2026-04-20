@@ -18,19 +18,15 @@ import {
   Legend,
 } from "recharts";
 import { cn, fmtINR, fmtINRShort } from "@/lib/utils";
-import { SERIES_COLORS } from "@/lib/chart-palette";
-
-const statusColors: Record<string, string> = {
-  active: "hsl(142 71% 45%)",
-  expiring: "hsl(36 85% 58%)",
-  critical: "hsl(25 90% 55%)",
-  expired: "hsl(0 65% 55%)",
-};
+import { MEMBERSHIP_STATUS_DOT, SERIES_COLORS, VALIDITY_BUCKET_DOT } from "@/lib/chart-palette";
 
 const GRID_STROKE = "hsl(var(--border) / 0.5)";
 const AXIS_TICK = { fill: "hsl(var(--muted-foreground))", fontSize: 11 };
 
-/** Fixed-height box so Recharts fills exactly — removes stray bottom gap in cards. */
+/** Insets plot inside the SVG — keep bottom modest so axis labels don’t leave a tall empty band under the chart. */
+const CHART_MARGIN = { top: 6, right: 4, left: 2, bottom: 8 };
+
+/** Fixed-height box so Recharts fills CardContent width without clipping card rounding. */
 function ChartBox({
   children,
   className,
@@ -38,10 +34,10 @@ function ChartBox({
   children: React.ReactNode;
   className?: string;
 }) {
-  return <div className={cn("w-full overflow-hidden", className)}>{children}</div>;
+  return <div className={cn("w-full min-w-0 overflow-hidden", className)}>{children}</div>;
 }
 
-function CustomTooltip({ active, payload, label, format }: any) {
+function CustomTooltip({ active, payload, label, format, dotFillForRow }: any) {
   if (!active || !payload?.length) return null;
   return (
     <div className="rounded-lg border border-border bg-popover px-3 py-2 text-xs shadow-none min-w-[140px]">
@@ -51,17 +47,26 @@ function CustomTooltip({ active, payload, label, format }: any) {
         </p>
       )}
       <div className="space-y-1">
-        {payload.map((p: any, i: number) => (
-          <div key={i} className="flex items-center justify-between gap-3">
-            <span className="flex items-center gap-2 text-muted-foreground text-[11px]">
-              <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: p.color || p.fill }} />
-              {p.name}
-            </span>
-            <span className="font-semibold tabular-nums text-foreground text-[11px]">
-              {format ? format(p.value) : p.value}
-            </span>
-          </div>
-        ))}
+        {payload.map((p: any, i: number) => {
+          const row = p.payload as { key?: string; label?: string } | undefined;
+          const dotKey = row?.key ?? row?.label;
+          const dotFill =
+            (dotKey && dotFillForRow?.[dotKey]) ||
+            (typeof p.fill === "string" && !p.fill.startsWith("url(") ? p.fill : null) ||
+            (typeof p.color === "string" && !p.color.startsWith("url(") ? p.color : null) ||
+            "hsl(var(--muted-foreground))";
+          return (
+            <div key={i} className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-2 text-muted-foreground text-[11px]">
+                <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: dotFill }} />
+                {p.name}
+              </span>
+              <span className="font-semibold tabular-nums text-foreground text-[11px]">
+                {format ? format(p.value) : p.value}
+              </span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -71,7 +76,7 @@ export function RevenueAreaChart({ data }: { data: Array<{ label: string; revenu
   return (
     <ChartBox className="h-[192px] sm:h-[220px] md:h-[248px]">
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
+        <AreaChart data={data} margin={CHART_MARGIN}>
           <defs>
             <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="hsl(var(--gold))" stopOpacity={0.2} />
@@ -86,7 +91,7 @@ export function RevenueAreaChart({ data }: { data: Array<{ label: string; revenu
             tickLine={false}
             axisLine={false}
             tickFormatter={(v) => `₹${fmtINRShort(v)}`}
-            width={44}
+            width={46}
           />
           <Tooltip content={<CustomTooltip format={(v: number) => `₹${fmtINR(v)}`} />} />
           <Area
@@ -108,7 +113,7 @@ export function EnrolmentLineChart({ data }: { data: Array<{ date: string; count
   return (
     <ChartBox className="h-[192px] sm:h-[210px] md:h-[232px]">
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
+        <LineChart data={data} margin={CHART_MARGIN}>
           <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
           <XAxis
             dataKey="date"
@@ -118,7 +123,7 @@ export function EnrolmentLineChart({ data }: { data: Array<{ date: string; count
             interval={Math.max(0, Math.floor(data.length / 5) - 1)}
             tickMargin={6}
           />
-          <YAxis tick={AXIS_TICK} tickLine={false} axisLine={false} allowDecimals={false} width={28} />
+          <YAxis tick={AXIS_TICK} tickLine={false} axisLine={false} allowDecimals={false} width={36} />
           <Tooltip content={<CustomTooltip />} />
           <Line
             type="monotone"
@@ -141,20 +146,33 @@ export function BatchPieChart({ data }: { data: Array<{ name: string; value: num
     <ChartBox className="h-[220px] sm:h-[252px] md:h-[268px]">
       <ResponsiveContainer width="100%" height="100%">
         <PieChart margin={{ top: 0, right: 0, left: 0, bottom: 4 }}>
+          <defs>
+            {data.map((_, i) => {
+              const base = SERIES_COLORS[i % SERIES_COLORS.length];
+              return (
+                <radialGradient key={i} id={`pie-slice-grad-${i}`} cx="42%" cy="42%" r="78%">
+                  <stop offset="0%" stopColor={base} stopOpacity={0.95} />
+                  <stop offset="72%" stopColor={base} stopOpacity={0.72} />
+                  <stop offset="100%" stopColor={base} stopOpacity={0.45} />
+                </radialGradient>
+              );
+            })}
+          </defs>
           <Pie
             data={data}
             cx="50%"
             cy="46%"
             innerRadius="52%"
             outerRadius="78%"
-            paddingAngle={2}
+            paddingAngle={2.5}
+            cornerRadius={6}
             dataKey="value"
             nameKey="name"
             strokeWidth={2}
             stroke="hsl(var(--card))"
           >
             {data.map((_, i) => (
-              <Cell key={i} fill={SERIES_COLORS[i % SERIES_COLORS.length]} />
+              <Cell key={i} fill={`url(#pie-slice-grad-${i})`} />
             ))}
           </Pie>
           <Tooltip content={<CustomTooltip />} />
@@ -176,14 +194,43 @@ export function StatusBarChart({ data }: { data: Array<{ name: string; value: nu
   return (
     <ChartBox className="h-[192px] sm:h-[210px] md:h-[232px]">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 4, right: 4, left: -16, bottom: 0 }} barCategoryGap="16%">
+        <BarChart data={data} margin={CHART_MARGIN} barCategoryGap="14%">
+          <defs>
+            <linearGradient id="status-grad-trial" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0%" stopColor="hsl(258 90% 44%)" />
+              <stop offset="45%" stopColor="hsl(292 72% 50%)" />
+              <stop offset="100%" stopColor="hsl(328 82% 62%)" />
+            </linearGradient>
+            <linearGradient id="status-grad-active" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0%" stopColor="hsl(142 65% 34%)" />
+              <stop offset="100%" stopColor="hsl(152 71% 52%)" />
+            </linearGradient>
+            <linearGradient id="status-grad-expiring" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0%" stopColor="hsl(32 88% 44%)" />
+              <stop offset="100%" stopColor="hsl(42 96% 58%)" />
+            </linearGradient>
+            <linearGradient id="status-grad-critical" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0%" stopColor="hsl(18 92% 42%)" />
+              <stop offset="100%" stopColor="hsl(28 96% 56%)" />
+            </linearGradient>
+            <linearGradient id="status-grad-expired" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0%" stopColor="hsl(0 72% 38%)" />
+              <stop offset="100%" stopColor="hsl(0 65% 58%)" />
+            </linearGradient>
+          </defs>
           <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
           <XAxis dataKey="name" tick={AXIS_TICK} tickLine={false} axisLine={false} tickMargin={6} />
-          <YAxis tick={AXIS_TICK} tickLine={false} axisLine={false} allowDecimals={false} width={26} />
-          <Tooltip content={<CustomTooltip />} cursor={{ fill: "hsl(var(--muted) / 0.2)" }} />
-          <Bar dataKey="value" name="Students" radius={[4, 4, 0, 0]} maxBarSize={40}>
+          <YAxis tick={AXIS_TICK} tickLine={false} axisLine={false} allowDecimals={false} width={34} />
+          <Tooltip
+            content={<CustomTooltip dotFillForRow={MEMBERSHIP_STATUS_DOT} />}
+            cursor={{ fill: "hsl(var(--muted) / 0.2)" }}
+          />
+          <Bar dataKey="value" name="Students" radius={[4, 4, 0, 0]} maxBarSize={36}>
             {data.map((entry, i) => (
-              <Cell key={i} fill={statusColors[entry.key] || SERIES_COLORS[i % SERIES_COLORS.length]} />
+              <Cell
+                key={i}
+                fill={`url(#status-grad-${entry.key})`}
+              />
             ))}
           </Bar>
         </BarChart>
@@ -197,7 +244,18 @@ export function TopBatchesBarChart({ data }: { data: Array<{ name: string; reven
   return (
     <ChartBox className="h-[192px] sm:h-[232px] md:h-[256px]">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} layout="vertical" margin={{ top: 4, right: 8, left: 0, bottom: 0 }} barCategoryGap="14%">
+        <BarChart data={data} layout="vertical" margin={{ top: 6, right: 8, left: 2, bottom: 10 }} barCategoryGap="14%">
+          <defs>
+            {data.map((_, i) => {
+              const c = SERIES_COLORS[i % SERIES_COLORS.length];
+              return (
+                <linearGradient key={i} id={`top-batch-grad-${i}`} x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor={c} stopOpacity={0.88} />
+                  <stop offset="100%" stopColor={c} stopOpacity={0.48} />
+                </linearGradient>
+              );
+            })}
+          </defs>
           <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} horizontal={false} />
           <XAxis
             type="number"
@@ -206,11 +264,11 @@ export function TopBatchesBarChart({ data }: { data: Array<{ name: string; reven
             axisLine={false}
             tickFormatter={(v) => `₹${fmtINRShort(v)}`}
           />
-          <YAxis type="category" dataKey="name" tick={AXIS_TICK} tickLine={false} axisLine={false} width={88} />
+          <YAxis type="category" dataKey="name" tick={AXIS_TICK} tickLine={false} axisLine={false} width={92} />
           <Tooltip content={<CustomTooltip format={(v: number) => `₹${fmtINR(v)}`} />} cursor={{ fill: "hsl(var(--muted) / 0.15)" }} />
           <Bar dataKey="revenue" name="Revenue" radius={[0, 4, 4, 0]} maxBarSize={20}>
             {data.map((_, i) => (
-              <Cell key={i} fill={SERIES_COLORS[i % SERIES_COLORS.length]} />
+              <Cell key={i} fill={`url(#top-batch-grad-${i})`} />
             ))}
           </Bar>
         </BarChart>
@@ -227,7 +285,7 @@ export function StudioFreelanceStackedBarChart({
   return (
     <ChartBox className="h-[192px] sm:h-[220px] md:h-[248px]">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 4, right: 4, left: -16, bottom: 0 }} barCategoryGap="18%">
+        <BarChart data={data} margin={CHART_MARGIN} barCategoryGap="18%">
           <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
           <XAxis dataKey="label" tick={AXIS_TICK} tickLine={false} axisLine={false} tickMargin={6} />
           <YAxis
@@ -235,16 +293,26 @@ export function StudioFreelanceStackedBarChart({
             tickLine={false}
             axisLine={false}
             tickFormatter={(v) => `₹${fmtINRShort(v)}`}
-            width={44}
+            width={46}
           />
+          <defs>
+            <linearGradient id="stack-grad-studio" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0%" stopColor="hsl(var(--chart-1))" stopOpacity={0.55} />
+              <stop offset="100%" stopColor="hsl(var(--chart-1))" stopOpacity={1} />
+            </linearGradient>
+            <linearGradient id="stack-grad-freelance" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0%" stopColor="hsl(var(--gold))" stopOpacity={0.5} />
+              <stop offset="100%" stopColor="hsl(var(--gold))" stopOpacity={1} />
+            </linearGradient>
+          </defs>
           <Tooltip content={<CustomTooltip format={(v: number) => `₹${fmtINR(v)}`} />} cursor={{ fill: "hsl(var(--muted) / 0.15)" }} />
           <Legend
             wrapperStyle={{ fontSize: "10px", paddingTop: 4, color: "hsl(var(--muted-foreground))" }}
             iconType="circle"
             iconSize={7}
           />
-          <Bar dataKey="studio" name="Studio" stackId="rev" fill="hsl(var(--chart-1))" radius={[0, 0, 0, 0]} maxBarSize={44} />
-          <Bar dataKey="freelance" name="Freelance" stackId="rev" fill="hsl(var(--gold))" radius={[4, 4, 0, 0]} maxBarSize={44} />
+          <Bar dataKey="studio" name="Studio" stackId="rev" fill="url(#stack-grad-studio)" radius={[0, 0, 0, 0]} maxBarSize={44} />
+          <Bar dataKey="freelance" name="Freelance" stackId="rev" fill="url(#stack-grad-freelance)" radius={[4, 4, 0, 0]} maxBarSize={44} />
         </BarChart>
       </ResponsiveContainer>
     </ChartBox>
@@ -255,12 +323,18 @@ export function MonthlyEnrolmentsBarChart({ data }: { data: Array<{ label: strin
   return (
     <ChartBox className="h-[192px] sm:h-[210px] md:h-[232px]">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 4, right: 4, left: -16, bottom: 0 }} barCategoryGap="16%">
+        <BarChart data={data} margin={CHART_MARGIN} barCategoryGap="16%">
+          <defs>
+            <linearGradient id="enrol-grad" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0%" stopColor="hsl(var(--chart-2))" stopOpacity={0.45} />
+              <stop offset="100%" stopColor="hsl(var(--chart-2))" stopOpacity={1} />
+            </linearGradient>
+          </defs>
           <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
           <XAxis dataKey="label" tick={AXIS_TICK} tickLine={false} axisLine={false} tickMargin={6} />
-          <YAxis tick={AXIS_TICK} tickLine={false} axisLine={false} allowDecimals={false} width={28} />
+          <YAxis tick={AXIS_TICK} tickLine={false} axisLine={false} allowDecimals={false} width={36} />
           <Tooltip content={<CustomTooltip />} cursor={{ fill: "hsl(var(--muted) / 0.2)" }} />
-          <Bar dataKey="students" name="New students" radius={[4, 4, 0, 0]} maxBarSize={40} fill="hsl(var(--chart-2))" />
+          <Bar dataKey="students" name="New students" radius={[4, 4, 0, 0]} maxBarSize={40} fill="url(#enrol-grad)" />
         </BarChart>
       </ResponsiveContainer>
     </ChartBox>
@@ -268,24 +342,49 @@ export function MonthlyEnrolmentsBarChart({ data }: { data: Array<{ label: strin
 }
 
 export function ValidityBarChart({ data }: { data: Array<{ label: string; count: number }> }) {
-  const bucketColors: Record<string, string> = {
-    Expired: "hsl(0 65% 55%)",
-    "0-7d": "hsl(25 90% 55%)",
-    "8-30d": "hsl(36 85% 58%)",
-    "31-90d": "hsl(168 55% 55%)",
-    "90d+": "hsl(142 71% 45%)",
+  const bucketGradId: Record<string, string> = {
+    Expired: "validity-grad-expired",
+    "0-7d": "validity-grad-07",
+    "8-30d": "validity-grad-830",
+    "31-90d": "validity-grad-3190",
+    "90d+": "validity-grad-90p",
   };
   return (
     <ChartBox className="h-[192px] sm:h-[210px] md:h-[232px]">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 4, right: 4, left: -16, bottom: 0 }} barCategoryGap="16%">
+        <BarChart data={data} margin={CHART_MARGIN} barCategoryGap="16%">
+          <defs>
+            <linearGradient id="validity-grad-expired" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0%" stopColor="hsl(0 72% 40%)" />
+              <stop offset="100%" stopColor="hsl(0 65% 58%)" />
+            </linearGradient>
+            <linearGradient id="validity-grad-07" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0%" stopColor="hsl(18 90% 42%)" />
+              <stop offset="100%" stopColor="hsl(25 90% 56%)" />
+            </linearGradient>
+            <linearGradient id="validity-grad-830" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0%" stopColor="hsl(30 88% 44%)" />
+              <stop offset="100%" stopColor="hsl(36 85% 60%)" />
+            </linearGradient>
+            <linearGradient id="validity-grad-3190" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0%" stopColor="hsl(168 48% 38%)" />
+              <stop offset="100%" stopColor="hsl(168 55% 56%)" />
+            </linearGradient>
+            <linearGradient id="validity-grad-90p" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0%" stopColor="hsl(142 58% 36%)" />
+              <stop offset="100%" stopColor="hsl(142 71% 48%)" />
+            </linearGradient>
+          </defs>
           <CartesianGrid strokeDasharray="3 3" stroke={GRID_STROKE} vertical={false} />
           <XAxis dataKey="label" tick={AXIS_TICK} tickLine={false} axisLine={false} tickMargin={6} />
-          <YAxis tick={AXIS_TICK} tickLine={false} axisLine={false} allowDecimals={false} width={26} />
-          <Tooltip content={<CustomTooltip />} cursor={{ fill: "hsl(var(--muted) / 0.2)" }} />
+          <YAxis tick={AXIS_TICK} tickLine={false} axisLine={false} allowDecimals={false} width={34} />
+          <Tooltip
+            content={<CustomTooltip dotFillForRow={VALIDITY_BUCKET_DOT} />}
+            cursor={{ fill: "hsl(var(--muted) / 0.2)" }}
+          />
           <Bar dataKey="count" name="Students" radius={[4, 4, 0, 0]} maxBarSize={40}>
             {data.map((entry, i) => (
-              <Cell key={i} fill={bucketColors[entry.label] || SERIES_COLORS[i % SERIES_COLORS.length]} />
+              <Cell key={i} fill={`url(#${bucketGradId[entry.label] ?? "validity-grad-90p"})`} />
             ))}
           </Bar>
         </BarChart>

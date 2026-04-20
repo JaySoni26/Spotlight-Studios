@@ -2,7 +2,7 @@
 import * as React from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Phone, BriefcaseBusiness, Calendar, ChevronRight } from "lucide-react";
+import { Plus, Pencil, Trash2, Phone, BriefcaseBusiness, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -158,36 +158,50 @@ function FreelancePageInner() {
         </Card>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card className="overflow-hidden rounded-2xl border-border/55 shadow-sm transition-shadow hover:shadow-md">
-          <CardHeader className="pb-2 pt-5">
-            <CardDescription className="text-[11px] font-semibold uppercase tracking-wide">Gigs</CardDescription>
-            <CardTitle className="text-2xl font-semibold tabular-nums">{gigs.length}</CardTitle>
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
+        <Card className="overflow-hidden rounded-xl border-border/60 shadow-sm">
+          <CardHeader className="space-y-1 p-4 pb-3 sm:p-5 sm:pb-3">
+            <CardDescription className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Gigs
+            </CardDescription>
+            <CardTitle className="text-2xl font-semibold tabular-nums tracking-tight">{gigs.length}</CardTitle>
           </CardHeader>
-          <CardContent className="pb-5 text-xs text-muted-foreground leading-snug">Active records</CardContent>
+          <CardContent className="px-4 pb-4 pt-0 text-xs leading-snug text-muted-foreground sm:px-5 sm:pb-5">
+            Active engagements
+          </CardContent>
         </Card>
-        <Card className="overflow-hidden rounded-2xl border-border/55 shadow-sm transition-shadow hover:shadow-md">
-          <CardHeader className="pb-2 pt-5">
-            <CardDescription className="text-[11px] font-semibold uppercase tracking-wide">Total billed</CardDescription>
-            <CardTitle className="text-2xl font-semibold tabular-nums text-[hsl(var(--gold))]">₹{fmtINR(totalAmount)}</CardTitle>
+        <Card className="overflow-hidden rounded-xl border-border/60 shadow-sm">
+          <CardHeader className="space-y-1 p-4 pb-3 sm:p-5 sm:pb-3">
+            <CardDescription className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Total billed
+            </CardDescription>
+            <CardTitle className="text-2xl font-semibold tabular-nums tracking-tight text-[hsl(var(--gold))]">
+              ₹{fmtINR(totalAmount)}
+            </CardTitle>
           </CardHeader>
-          <CardContent className="pb-5 text-xs text-muted-foreground leading-snug">Sum of client payouts</CardContent>
+          <CardContent className="px-4 pb-4 pt-0 text-xs leading-snug text-muted-foreground sm:px-5 sm:pb-5">
+            Client payouts
+          </CardContent>
         </Card>
-        <Card className="overflow-hidden rounded-2xl border-border/55 shadow-sm transition-shadow hover:shadow-md sm:col-span-1">
-          <CardHeader className="pb-2 pt-5">
-            <CardDescription className="text-[11px] font-semibold uppercase tracking-wide">Days booked</CardDescription>
-            <CardTitle className="text-2xl font-semibold tabular-nums">{totalDays}</CardTitle>
-          </CardHeader>
-          <CardContent className="pb-5 text-xs text-muted-foreground leading-snug">Across all engagements</CardContent>
+        <Card className="col-span-2 overflow-hidden rounded-xl border-border/60 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5">
+            <div className="space-y-1">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Days booked</p>
+              <p className="text-2xl font-semibold tabular-nums tracking-tight">{totalDays}</p>
+            </div>
+            <p className="max-w-[14rem] text-right text-xs leading-snug text-muted-foreground sm:text-left">
+              Total days of work across every gig in your list.
+            </p>
+          </div>
         </Card>
       </div>
 
       {loading && gigs.length === 0 ? (
         <div className="space-y-6">
-          <div className="grid gap-3 sm:grid-cols-3">
-            {[...Array(3)].map((_, i) => (
-              <Skeleton key={i} className="h-28 rounded-xl" />
-            ))}
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            <Skeleton className="h-28 rounded-xl" />
+            <Skeleton className="h-28 rounded-xl" />
+            <Skeleton className="col-span-2 h-24 rounded-xl" />
           </div>
           <Skeleton className="h-14 w-full max-w-xl rounded-xl" />
           <div className="space-y-2">
@@ -214,87 +228,93 @@ function FreelancePageInner() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {gigs.map((gig, idx) => {
-            const c = seriesColor(idx);
-            const phoneDisp = gig.phone ? formatINMobileDisplay(digitsOnlyPhone(String(gig.phone))) : "";
-            return (
-              <article
-                key={gig.id}
-                role="button"
-                tabIndex={0}
-                className="group cursor-pointer overflow-hidden rounded-2xl border border-border/55 bg-card text-card-foreground shadow-sm transition-all duration-200 hover:border-border hover:shadow-md active:scale-[0.99] dark:border-border/50"
-                onClick={() => openDetail(gig, idx)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    openDetail(gig, idx);
-                  }
-                }}
-              >
-                <div
-                  className="relative h-24 w-full overflow-hidden sm:h-28"
-                  style={{
-                    background: `linear-gradient(135deg, color-mix(in srgb, ${c} 42%, hsl(var(--card))) 0%, color-mix(in srgb, ${c} 12%, hsl(var(--muted))) 55%, hsl(var(--muted) / 0.35) 100%)`,
+        <section className="space-y-5">
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 className="text-lg font-semibold tracking-tight">All gigs</h2>
+            <span className="text-sm tabular-nums text-muted-foreground">{gigs.length} places</span>
+          </div>
+          <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 sm:gap-x-8 sm:gap-y-10">
+            {gigs.map((gig, idx) => {
+              const c = seriesColor(idx);
+              const phoneDisp = gig.phone ? formatINMobileDisplay(digitsOnlyPhone(String(gig.phone))) : "";
+              return (
+                <article
+                  key={gig.id}
+                  role="button"
+                  tabIndex={0}
+                  className="group cursor-pointer overflow-hidden rounded-xl border border-border/60 bg-card text-left text-card-foreground shadow-sm transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  onClick={() => openDetail(gig, idx)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      openDetail(gig, idx);
+                    }
                   }}
                 >
-                  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_30%_20%,rgba(255,255,255,0.22),transparent_55%)] dark:bg-[radial-gradient(ellipse_at_30%_20%,rgba(255,255,255,0.08),transparent_50%)]" />
-                  <div className="absolute bottom-2.5 left-4 right-4 flex items-end justify-between gap-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/90 drop-shadow-sm dark:text-foreground/90">
-                      Client
-                    </p>
-                    <span className="rounded-full border-0 bg-background/90 px-2.5 py-1 text-[11px] font-semibold text-foreground shadow-sm backdrop-blur-sm dark:bg-background/80 tabular-nums">
+                  <div className="relative aspect-[5/3] w-full overflow-hidden bg-muted/40">
+                    <div
+                      className="absolute inset-0"
+                      style={{
+                        background: `linear-gradient(165deg, color-mix(in srgb, ${c} 22%, hsl(var(--muted))) 0%, hsl(var(--muted) / 0.35) 100%)`,
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_30%,rgba(255,255,255,0.18),transparent_55%)] dark:bg-[radial-gradient(ellipse_at_50%_30%,rgba(255,255,255,0.05),transparent_55%)]" />
+                    <div className="absolute right-3 top-3 rounded-lg border border-border/40 bg-background/95 px-2.5 py-1 text-sm font-semibold tabular-nums text-foreground shadow-sm backdrop-blur-sm dark:bg-background/90">
                       ₹{fmtINR(gig.amount)}
-                    </span>
+                      <span className="text-muted-foreground"> / {gig.work_days} {gig.work_days === 1 ? "day" : "days"}</span>
+                    </div>
                   </div>
-                </div>
-                <div className="space-y-3 p-4 sm:p-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <h3 className="truncate text-[17px] font-semibold leading-snug tracking-tight text-foreground">{gig.client_name}</h3>
-                      {phoneDisp ? (
-                        <p className="mt-1.5 flex items-center gap-2 text-[13px] text-muted-foreground tabular-nums">
-                          <Phone className="h-3.5 w-3.5 shrink-0 opacity-80" />
-                          <span className="truncate">{phoneDisp}</span>
+                  <div className="border-t border-border/50 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <h3 className="truncate text-[15px] font-semibold leading-snug tracking-tight">{gig.client_name}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {phoneDisp ? (
+                            <span className="inline-flex items-center gap-1.5 tabular-nums">
+                              <Phone className="h-3.5 w-3.5 shrink-0 opacity-70" />
+                              {phoneDisp}
+                            </span>
+                          ) : (
+                            <span>No phone</span>
+                          )}
                         </p>
-                      ) : (
-                        <p className="mt-1.5 text-[13px] text-muted-foreground">No phone</p>
-                      )}
+                        {gig.notes ? (
+                          <p className="line-clamp-2 pt-1 text-[13px] leading-relaxed text-muted-foreground">{gig.notes}</p>
+                        ) : null}
+                      </div>
+                      <div className="flex shrink-0 gap-1" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9 rounded-full text-muted-foreground hover:text-foreground"
+                          onClick={() => openEdit(gig)}
+                          aria-label="Edit"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9 rounded-full text-muted-foreground hover:text-destructive"
+                          onClick={() => remove(gig)}
+                          aria-label="Delete"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex shrink-0 gap-0.5" onClick={(e) => e.stopPropagation()}>
-                      <Button variant="secondary" size="icon" className="h-9 w-9 rounded-full shadow-none" onClick={() => openEdit(gig)} aria-label="Edit">
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button variant="secondary" size="icon" className="h-9 w-9 rounded-full shadow-none" onClick={() => remove(gig)} aria-label="Delete">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                    <div className="mt-3 flex items-center justify-between border-t border-border/40 pt-3 text-sm font-medium text-foreground">
+                      <span className="inline-flex items-center gap-1 text-muted-foreground group-hover:text-foreground">
+                        Show details
+                        <ChevronRight className="h-4 w-4 opacity-70 transition-transform group-hover:translate-x-0.5" />
+                      </span>
                     </div>
                   </div>
-                  {gig.notes ? <p className="line-clamp-2 text-[13px] leading-relaxed text-muted-foreground">{gig.notes}</p> : null}
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border/50 pt-3 text-[13px] text-muted-foreground">
-                    <span className="inline-flex items-center gap-1.5 font-medium text-[hsl(var(--gold))] tabular-nums">
-                      ₹{fmtINR(gig.amount)}
-                    </span>
-                    <span className="text-border" aria-hidden>
-                      ·
-                    </span>
-                    <span className="inline-flex items-center gap-1.5">
-                      <Calendar className="h-3.5 w-3.5 opacity-70" />
-                      {gig.work_days} {gig.work_days === 1 ? "day" : "days"}
-                    </span>
-                    <span className="text-border hidden sm:inline" aria-hidden>
-                      ·
-                    </span>
-                    <span className="hidden items-center gap-1 sm:inline-flex">
-                      <ChevronRight className="h-3.5 w-3.5 opacity-60" />
-                      Details
-                    </span>
-                  </div>
-                </div>
-              </article>
-            );
-          })}
-        </div>
+                </article>
+              );
+            })}
+          </div>
+        </section>
       )}
 
       <Dialog open={open} onOpenChange={setOpen}>

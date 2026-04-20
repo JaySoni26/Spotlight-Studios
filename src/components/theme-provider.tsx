@@ -45,7 +45,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/settings", { cache: "no-store" });
+        const res = await fetch("/api/theme", { cache: "no-store" });
         if (!res.ok) return;
         const data = await res.json();
         if (cancelled) return;

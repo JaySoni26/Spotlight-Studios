@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { DeleteWithCodeInput, StudentInput } from "@/lib/schemas";
 import { randomUUID } from "crypto";
-import { endDateOf, verifyDeleteCode } from "@/lib/utils";
+import { endDateOf, getStudentEndDate, verifyDeleteCode } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +19,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
      FROM student_leaves WHERE student_id = ? ORDER BY created_at DESC LIMIT 20`,
     [params.id],
   );
-  return NextResponse.json({ ...row, end_date: endDateOf(row.start_date, row.validity_days), leaves });
+  return NextResponse.json({ ...row, end_date: getStudentEndDate(row), leaves });
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
@@ -32,17 +32,23 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const existing = await d.get<{ batch_id: string | null }>("SELECT batch_id FROM students WHERE id = ?", [params.id]);
     if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+    const kind = parsed.enrollment_kind === "trial" ? "trial" : "paid";
+    const trialEnd = kind === "trial" ? endDateOf(parsed.start_date, parsed.validity_days) : null;
+    const amount = kind === "trial" ? 0 : parsed.amount;
+
     await d.run(`
-      UPDATE students SET name = ?, phone = ?, amount = ?, start_date = ?, validity_days = ?, batch_id = ?, notes = ?
+      UPDATE students SET name = ?, phone = ?, amount = ?, start_date = ?, validity_days = ?, batch_id = ?, notes = ?, enrollment_kind = ?, trial_end_date = ?
       WHERE id = ?
     `, [
       parsed.name,
       parsed.phone ?? null,
-      parsed.amount,
+      amount,
       parsed.start_date,
       parsed.validity_days,
       parsed.batch_id || null,
       parsed.notes ?? null,
+      kind,
+      trialEnd,
       params.id,
     ]);
 
@@ -61,7 +67,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       WHERE s.id = ?
     `, [params.id]);
 
-    return NextResponse.json({ ...row, end_date: endDateOf(row.start_date, row.validity_days) });
+    return NextResponse.json({ ...row, end_date: getStudentEndDate(row) });
   } catch (e: any) {
     return NextResponse.json({ error: e.message ?? "Invalid input" }, { status: 400 });
   }

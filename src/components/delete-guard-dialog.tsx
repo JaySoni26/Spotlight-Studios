@@ -16,6 +16,10 @@ interface DeleteGuardDialogProps {
   description: string;
   confirmLabel: string;
   requireRefund?: boolean;
+  /** Prefills refund field when opening (e.g. prorated unused fee). */
+  defaultRefundAmount?: number;
+  /** Extra panel above refund input (fee breakdown, etc.). */
+  refundContext?: React.ReactNode;
   onConfirm: (values: { code: string; refundAmount: number }) => Promise<void> | void;
 }
 
@@ -26,6 +30,8 @@ export function DeleteGuardDialog({
   description,
   confirmLabel,
   requireRefund = false,
+  defaultRefundAmount,
+  refundContext,
   onConfirm,
 }: DeleteGuardDialogProps) {
   const [loading, setLoading] = React.useState(false);
@@ -36,8 +42,14 @@ export function DeleteGuardDialog({
     if (!open) {
       setCode("");
       setRefundAmount("0");
+      return;
     }
-  }, [open]);
+    if (requireRefund && defaultRefundAmount != null && !Number.isNaN(defaultRefundAmount)) {
+      setRefundAmount(String(Math.max(0, Math.round(defaultRefundAmount))));
+    } else if (requireRefund) {
+      setRefundAmount("0");
+    }
+  }, [open, requireRefund, defaultRefundAmount]);
 
   const handleConfirm = async () => {
     setLoading(true);
@@ -60,8 +72,8 @@ export function DeleteGuardDialog({
         <EntityFormMobileHeader title={title} onBack={() => onOpenChange(false)} />
 
         <div className="flex min-h-0 flex-1 flex-col sm:max-h-[min(90vh,720px)]">
-          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-5 pb-2 pt-1 sm:px-8 sm:pb-4 sm:pt-6">
-            <DialogHeader className="hidden space-y-2 text-left sm:block sm:pr-8">
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-3 pb-2 pt-1 sm:px-6 sm:pb-4 sm:pt-5">
+            <DialogHeader className="hidden space-y-2 text-left sm:block sm:pr-0">
               <div className="flex items-start gap-3">
                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-destructive/12 text-destructive">
                   <AlertTriangle className="h-5 w-5" strokeWidth={2} aria-hidden />
@@ -74,7 +86,7 @@ export function DeleteGuardDialog({
             </DialogHeader>
 
             <div
-              className="flex gap-3 rounded-2xl border border-destructive/25 bg-destructive/[0.07] px-3.5 py-3 sm:hidden dark:bg-destructive/10"
+              className="flex gap-3 rounded-xl border border-destructive/25 bg-destructive/[0.07] px-3 py-2.5 sm:hidden dark:bg-destructive/10"
               role="status"
             >
               <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" strokeWidth={2} aria-hidden />
@@ -82,6 +94,7 @@ export function DeleteGuardDialog({
             </div>
 
             <div className="space-y-5">
+              {refundContext ? <div className="space-y-2">{refundContext}</div> : null}
               {requireRefund && (
                 <div className="space-y-2">
                   <Label htmlFor="refund-amount" variant="form">
@@ -117,7 +130,7 @@ export function DeleteGuardDialog({
             </div>
           </div>
 
-          <DialogFooter className="mt-auto grid grid-cols-2 gap-3 border-t border-border/50 bg-muted/15 px-5 py-4 max-sm:pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex sm:justify-end sm:gap-2 sm:px-8 sm:py-5">
+          <DialogFooter className="mt-auto grid grid-cols-2 gap-3 border-t border-border/50 bg-muted/15 px-3 py-3 max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:flex sm:justify-end sm:gap-2 sm:px-6 sm:py-4">
             <Button
               type="button"
               variant="outline"

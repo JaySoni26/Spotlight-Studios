@@ -35,19 +35,22 @@ export function StudentFormDialog({ open, onOpenChange, batches, student, defaul
     validity_days: "30",
     batch_id: "",
     notes: "",
+    enrollment_kind: "paid" as "paid" | "trial",
   });
 
   React.useEffect(() => {
     if (!open) return;
     if (student) {
+      const isTrial = (student.enrollment_kind || "paid") === "trial";
       setForm({
         name: student.name || "",
         phone: student.phone ? digitsOnlyPhone(String(student.phone)) : "",
-        amount: String(student.amount ?? ""),
+        amount: isTrial ? "0" : String(student.amount ?? ""),
         start_date: student.start_date || today(),
         validity_days: String(student.validity_days ?? 30),
         batch_id: student.batch_id || "",
         notes: student.notes || "",
+        enrollment_kind: isTrial ? "trial" : "paid",
       });
     } else {
       setForm({
@@ -58,6 +61,7 @@ export function StudentFormDialog({ open, onOpenChange, batches, student, defaul
         validity_days: "30",
         batch_id: defaultBatchId || "",
         notes: "",
+        enrollment_kind: "paid",
       });
     }
   }, [open, student, defaultBatchId]);
@@ -99,11 +103,15 @@ export function StudentFormDialog({ open, onOpenChange, batches, student, defaul
       const payload = {
         name: form.name.trim(),
         phone: phoneDigits || null,
-        amount: Number(form.amount) || 0,
+        amount: form.enrollment_kind === "trial" ? 0 : Number(form.amount) || 0,
         start_date: form.start_date,
-        validity_days: Number(form.validity_days) || 30,
+        validity_days:
+          form.enrollment_kind === "trial"
+            ? Math.max(1, Number(form.validity_days) || 1)
+            : Number(form.validity_days) || 30,
         batch_id: form.batch_id || null,
         notes: form.notes.trim() || null,
+        enrollment_kind: form.enrollment_kind,
       };
       if (editing) {
         await api.updateStudent(student.id, payload);
@@ -191,34 +199,73 @@ export function StudentFormDialog({ open, onOpenChange, batches, student, defaul
             </div>
           </div>
 
+          <div className="space-y-2">
+            <Label variant="form">Enrolment type</Label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                className={`rounded-xl border-2 px-4 py-3 text-left transition-all ${
+                  form.enrollment_kind === "paid"
+                    ? "border-primary bg-primary/[0.06]"
+                    : "border-border/60 hover:border-border"
+                }`}
+                onClick={() =>
+                  setForm((f) => ({
+                    ...f,
+                    enrollment_kind: "paid",
+                    validity_days: f.enrollment_kind === "trial" ? "30" : f.validity_days,
+                  }))
+                }
+              >
+                <span className="block text-[14px] font-semibold">Paid membership</span>
+                <span className="mt-1 block text-[11px] text-muted-foreground">Fee + validity dates</span>
+              </button>
+              <button
+                type="button"
+                className={`rounded-xl border-2 px-4 py-3 text-left transition-all ${
+                  form.enrollment_kind === "trial"
+                    ? "border-primary bg-primary/[0.06]"
+                    : "border-border/60 hover:border-border"
+                }`}
+                onClick={() => setForm((f) => ({ ...f, enrollment_kind: "trial", amount: "0", validity_days: "1" }))}
+              >
+                <span className="block text-[14px] font-semibold">Trial</span>
+                <span className="mt-1 block text-[11px] text-muted-foreground">Try before paying</span>
+              </button>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <Label htmlFor="amount" variant="form">
-                  Amount paid (₹)
+                  {form.enrollment_kind === "trial" ? "Recording fee (trial)" : "Amount paid (₹)"}
                 </Label>
-                {customAmount && (
+                {form.enrollment_kind !== "trial" && customAmount ? (
                   <Badge variant="warning" className="text-[10px] shrink-0">
                     Custom
                   </Badge>
-                )}
+                ) : null}
               </div>
               <Input
                 id="amount"
                 className="text-sm"
                 type="number"
                 min={0}
-                value={form.amount}
+                disabled={form.enrollment_kind === "trial"}
+                value={form.enrollment_kind === "trial" ? "0" : form.amount}
                 onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
                 placeholder="0"
               />
-              {selectedBatch && (
+              {form.enrollment_kind === "trial" ? (
+                <p className="text-xs text-muted-foreground leading-relaxed">Trials stay at ₹0 until you convert them to paid.</p>
+              ) : selectedBatch ? (
                 <p className="text-xs text-muted-foreground leading-relaxed">Batch default ₹{fmtINR(batchPrice)}</p>
-              )}
+              ) : null}
             </div>
             <div className="space-y-2">
               <Label htmlFor="validity" variant="form">
-                Validity (days)
+                {form.enrollment_kind === "trial" ? "Trial length (days)" : "Validity (days)"}
               </Label>
               <Input
                 id="validity"
@@ -228,7 +275,9 @@ export function StudentFormDialog({ open, onOpenChange, batches, student, defaul
                 value={form.validity_days}
                 onChange={(e) => setForm((f) => ({ ...f, validity_days: e.target.value }))}
               />
-              <p className="text-xs text-muted-foreground leading-relaxed">e.g. 30 for a month</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                {form.enrollment_kind === "trial" ? "How many days they can attend before converting." : "e.g. 30 for a month"}
+              </p>
             </div>
           </div>
 
@@ -264,11 +313,21 @@ export function StudentFormDialog({ open, onOpenChange, batches, student, defaul
               <Calendar className="h-4 w-4 text-primary mt-0.5 shrink-0" />
               <div className="text-sm">
                 <p className="font-medium">
-                  Membership ends on <span className="text-primary">{fmtDate(endPreview)}</span>
+                  {form.enrollment_kind === "trial" ? (
+                    <>
+                      Trial ends on <span className="text-primary">{fmtDate(endPreview)}</span>
+                    </>
+                  ) : (
+                    <>
+                      Membership ends on <span className="text-primary">{fmtDate(endPreview)}</span>
+                    </>
+                  )}
                 </p>
-                {form.amount && (
+                {form.enrollment_kind !== "trial" && form.amount ? (
                   <p className="text-xs text-muted-foreground mt-0.5">Fee recorded: ₹{fmtINR(Number(form.amount))}</p>
-                )}
+                ) : form.enrollment_kind === "trial" ? (
+                  <p className="text-xs text-muted-foreground mt-0.5">Convert to paid anytime from the student sheet.</p>
+                ) : null}
               </div>
             </div>
           )}

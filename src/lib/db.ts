@@ -216,6 +216,15 @@ async function migrate(d: DbClient) {
     );
     CREATE INDEX IF NOT EXISTS idx_student_leaves_student ON student_leaves(student_id);
   `);
+
+  const studentCols = await d.all<{ name: string }>("PRAGMA table_info(students)");
+  if (!studentCols.some((c) => c.name === "enrollment_kind")) {
+    await d.exec(`ALTER TABLE students ADD COLUMN enrollment_kind TEXT DEFAULT 'paid'`);
+    await d.run(`UPDATE students SET enrollment_kind = 'paid' WHERE enrollment_kind IS NULL`);
+  }
+  if (!studentCols.some((c) => c.name === "trial_end_date")) {
+    await d.exec(`ALTER TABLE students ADD COLUMN trial_end_date TEXT`);
+  }
 }
 
 // Row types
@@ -239,6 +248,8 @@ export interface StudentRow {
   batch_id: string | null;
   notes: string | null;
   created_at: number;
+  enrollment_kind?: string | null;
+  trial_end_date?: string | null;
 }
 
 export interface BatchHistoryRow {

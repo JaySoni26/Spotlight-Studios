@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { z } from "zod";
-import { endDateOf } from "@/lib/utils";
+import { endDateOf, getStudentEndDate } from "@/lib/utils";
 import { addDays, format, parseISO } from "date-fns";
 
 const RenewInput = z.object({
@@ -20,6 +20,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     const student = await d.get<any>("SELECT * FROM students WHERE id = ?", [params.id]);
     if (!student) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    if ((student.enrollment_kind || "paid") === "trial") {
+      return NextResponse.json(
+        { error: "Trial students cannot renew paid membership here — extend the trial or convert to paid first." },
+        { status: 400 },
+      );
+    }
 
     const currentEnd = endDateOf(student.start_date, student.validity_days);
     const today = new Date();
@@ -53,7 +60,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       WHERE s.id = ?
     `, [params.id]);
 
-    return NextResponse.json({ ...row, end_date: endDateOf(row.start_date, row.validity_days) });
+    return NextResponse.json({ ...row, end_date: getStudentEndDate(row) });
   } catch (e: any) {
     return NextResponse.json({ error: e.message ?? "Invalid input" }, { status: 400 });
   }

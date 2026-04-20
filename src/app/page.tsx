@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import Link from "next/link";
-import { Users, Wallet, TrendingUp, AlertTriangle, Calendar, BriefcaseBusiness, ArrowRight, Activity } from "lucide-react";
+import { Users, Wallet, TrendingUp, AlertTriangle, Calendar, BriefcaseBusiness, ArrowRight, Activity, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,12 @@ import {
 } from "@/components/charts";
 import { api } from "@/lib/api";
 import { cn, fmtDateShort, fmtINR, getInitials, getStatus } from "@/lib/utils";
+import {
+  batchAccentColor,
+  batchAvatarStyles,
+  MEMBERSHIP_STATUS_DOT,
+  trialEnrollmentChipStyles,
+} from "@/lib/chart-palette";
 import { Avatar } from "@/components/ui/avatar";
 
 function SectionHeading({
@@ -52,19 +58,30 @@ function ChartCard({
   className?: string;
 }) {
   return (
-    <Card plain className={cn("overflow-hidden flex flex-col", className)}>
-      <CardHeader className="space-y-2 shrink-0 px-5 pt-5 pb-1 sm:pt-5 sm:pb-1.5">
-        <CardTitle className="text-base font-semibold tracking-tight sm:text-lg">{title}</CardTitle>
-        <CardDescription className="text-sm leading-relaxed sm:text-[15px]">{description}</CardDescription>
-      </CardHeader>
-      <CardContent className="px-5 pb-5 pt-4 sm:pb-5 sm:pt-5 flex-1 flex flex-col min-h-0">
-        <div className="w-full min-h-0 flex-1">{children}</div>
-      </CardContent>
+    <Card plain className={cn("flex h-full min-h-0 flex-col overflow-hidden rounded-2xl", className)}>
+      {/* Single inset; gap matches separation — no flex-1 justify-end (that added dead space below heading vs tight top). */}
+      <div className="flex min-h-0 flex-1 flex-col gap-6 p-5 sm:p-6">
+        <div className="shrink-0 space-y-2">
+          <CardTitle className="text-base font-semibold tracking-tight sm:text-lg">{title}</CardTitle>
+          <CardDescription className="text-sm leading-relaxed sm:text-[15px]">{description}</CardDescription>
+        </div>
+        <div className="min-h-0 w-full shrink-0">{children}</div>
+      </div>
     </Card>
   );
 }
 
-function KpiCard({ title, value, subtitle, icon }: { title: string; value: React.ReactNode; subtitle: string; icon: React.ReactNode }) {
+function KpiCard({
+  title,
+  value,
+  subtitle,
+  icon,
+}: {
+  title: string;
+  value: React.ReactNode;
+  subtitle: React.ReactNode;
+  icon: React.ReactNode;
+}) {
   return (
     <Card className="h-full border-border/70">
       <CardHeader className="space-y-2.5 pb-2 pt-5 px-5 sm:space-y-3 sm:pt-5 sm:px-5">
@@ -77,22 +94,149 @@ function KpiCard({ title, value, subtitle, icon }: { title: string; value: React
         <div className="text-2xl font-semibold tabular-nums tracking-tight text-foreground leading-none sm:text-[1.75rem]">{value}</div>
       </CardHeader>
       <CardContent className="pt-0 px-5 pb-5 sm:px-5 sm:pb-5">
-        <p className="text-xs text-muted-foreground leading-snug sm:text-sm">{subtitle}</p>
+        <div className="text-xs text-muted-foreground leading-snug sm:text-sm">{subtitle}</div>
       </CardContent>
     </Card>
   );
 }
 
-function ListRow({ children, className }: { children: React.ReactNode; className?: string }) {
+function ListRow({
+  children,
+  className,
+  style,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
   return (
     <div
       className={cn(
         "flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-muted/30 px-3 py-2.5 sm:px-3.5",
         className,
       )}
+      style={style}
     >
       {children}
     </div>
+  );
+}
+
+function ExpiringSoonAttention({ list, batches }: { list: any[]; batches: { id: string }[] }) {
+  const slice = list.slice(0, 12);
+  return (
+    <section
+      className="rounded-[1.25rem] border border-border/50 bg-muted/35 shadow-[0_1px_2px_rgba(15,23,42,0.04)] dark:border-border/60 dark:bg-muted/20 dark:shadow-none"
+      aria-labelledby="dash-expiring-heading"
+    >
+      <div className="border-b border-border/40 px-5 py-6 sm:px-7 sm:py-7 lg:px-8">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+          <header className="max-w-2xl space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground">Up next</p>
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <h2
+                id="dash-expiring-heading"
+                className="text-[1.375rem] font-semibold leading-tight tracking-tight text-foreground sm:text-[1.625rem]"
+              >
+                Expiring soon
+              </h2>
+              <span className="inline-flex min-h-[1.75rem] items-center rounded-full bg-background/90 px-2.5 text-sm font-semibold tabular-nums text-foreground shadow-sm ring-1 ring-border/60 dark:bg-background/50">
+                {list.length}
+              </span>
+            </div>
+            <p className="text-[15px] leading-relaxed text-muted-foreground">
+              Memberships ending within 10 days. Open someone to renew, extend a trial, or convert to paid.
+            </p>
+          </header>
+          <Button
+            asChild
+            size="lg"
+            className="h-11 shrink-0 rounded-xl px-6 text-[15px] font-semibold shadow-sm transition-all hover:shadow-md"
+          >
+            <Link href="/students?status=expiring_soon" className="inline-flex items-center gap-1">
+              Show all
+              <ArrowRight className="h-4 w-4 opacity-90" aria-hidden />
+            </Link>
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid gap-2.5 p-4 sm:grid-cols-2 sm:gap-3 sm:p-5 lg:grid-cols-3 lg:p-6">
+        {slice.map((student: any) => {
+          const days = student.days_remaining;
+          const isTrial = (student.enrollment_kind || "paid") === "trial";
+          const ac = batchAccentColor(student.batch_id, batches);
+          const dayLabel =
+            days < 0
+              ? `Ended ${Math.abs(days)}d ago`
+              : days === 0
+                ? "Ends today"
+                : days === 1
+                  ? "1 day left"
+                  : `${days} days left`;
+
+          return (
+            <Link
+              key={student.id}
+              href={`/students?student=${encodeURIComponent(student.id)}`}
+              className={cn(
+                "group flex items-center gap-2.5 rounded-xl border-y border-r border-border/60 bg-card py-2 pl-2 pr-2.5 text-left shadow-sm ring-1 ring-black/[0.04] transition-all duration-200 ease-out sm:gap-3 sm:py-2.5 sm:pl-2.5 sm:pr-3",
+                "hover:-translate-y-px hover:border-border hover:shadow-md hover:ring-black/[0.06]",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                "dark:ring-white/[0.06] dark:hover:shadow-md",
+              )}
+              style={{
+                borderLeftWidth: 3,
+                borderLeftStyle: "solid",
+                borderLeftColor: ac,
+              }}
+            >
+              <Avatar
+                className="h-9 w-9 shrink-0 rounded-lg border-2 font-semibold shadow-inner ring-0 sm:h-10 sm:w-10 sm:text-xs"
+                style={batchAvatarStyles(student.batch_id, batches)}
+              >
+                {getInitials(student.name)}
+              </Avatar>
+              <div className="min-w-0 flex-1 py-0.5">
+                <div className="flex items-center gap-1.5">
+                  <p className="truncate text-[13px] font-semibold leading-tight tracking-tight text-foreground sm:text-sm">
+                    {student.name}
+                  </p>
+                  {isTrial ? (
+                    <span
+                      className="shrink-0 rounded border px-1 py-px text-[9px] font-bold uppercase tracking-wider"
+                      style={trialEnrollmentChipStyles(student.batch_id, batches)}
+                    >
+                      Trial
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-0.5 truncate text-[11px] leading-snug text-muted-foreground sm:text-[12px]">
+                  <span>{student.batch_name || "Unassigned"}</span>
+                  <span className="text-border"> · </span>
+                  <span className="tabular-nums">{fmtDateShort(student.end_date)}</span>
+                  <span className="text-border"> · </span>
+                  <span
+                    className={cn(
+                      "font-medium tabular-nums",
+                      days < 0 && "text-destructive",
+                      days >= 0 && days <= 3 && "text-foreground",
+                      days > 3 && "text-muted-foreground",
+                    )}
+                  >
+                    {dayLabel}
+                  </span>
+                </p>
+              </div>
+              <ChevronRight
+                className="h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform duration-200 group-hover:translate-x-px group-hover:text-muted-foreground"
+                aria-hidden
+              />
+            </Link>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -119,6 +263,18 @@ export default function DashboardPage() {
   React.useEffect(() => {
     load();
   }, [load]);
+
+  const membershipCounts = React.useMemo(() => {
+    const statusDistribution = data?.statusDistribution as { key: string; value: number }[] | undefined;
+    const m = Object.fromEntries(
+      (statusDistribution ?? []).map((x) => [x.key, x.value]),
+    ) as Record<string, number>;
+    return {
+      paidActive: m.active ?? 0,
+      trial: m.trial ?? 0,
+      paidExpiring: (m.expiring ?? 0) + (m.critical ?? 0),
+    };
+  }, [data?.statusDistribution]);
 
   if (loading && !data) return <DashboardSkeleton />;
   if (!data && loadError) {
@@ -148,8 +304,11 @@ export default function DashboardPage() {
     enrolmentTrend,
     validityDistribution,
     monthlyStudioFreelance,
+    batchesForAccent,
   } = data;
+  const batchesAccent = (batchesForAccent ?? []) as { id: string }[];
   const isEmpty = kpis.totalStudents === 0 && kpis.totalBatches === 0;
+  const hasExpiringSoon = (expiringList?.length ?? 0) > 0;
 
   return (
     <div className="space-y-9 md:space-y-11">
@@ -171,7 +330,29 @@ export default function DashboardPage() {
           <KpiCard
             title="Students"
             value={kpis.totalStudents}
-            subtitle={`${kpis.activeStudents} active · ${kpis.expiringSoon} expiring`}
+            subtitle={
+              <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                <span className="inline-flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: MEMBERSHIP_STATUS_DOT.active }} />
+                  {membershipCounts.paidActive} paid active
+                </span>
+                <span className="text-border">·</span>
+                <span className="inline-flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: MEMBERSHIP_STATUS_DOT.trial }} />
+                  {membershipCounts.trial} trial
+                </span>
+                <span className="text-border">·</span>
+                <span className="inline-flex items-center gap-1">
+                  <span
+                    className="h-1.5 w-1.5 shrink-0 rounded-full"
+                    style={{
+                      background: `linear-gradient(180deg, ${MEMBERSHIP_STATUS_DOT.expiring}, ${MEMBERSHIP_STATUS_DOT.critical})`,
+                    }}
+                  />
+                  {membershipCounts.paidExpiring} expiring (paid)
+                </span>
+              </span>
+            }
             icon={<Users className="h-4 w-4" />}
           />
           <KpiCard
@@ -206,6 +387,8 @@ export default function DashboardPage() {
           />
         </div>
       </section>
+
+      {hasExpiringSoon ? <ExpiringSoonAttention list={expiringList} batches={batchesAccent} /> : null}
 
       {isEmpty && (
         <Card className="border-dashed border-border/70">
@@ -292,47 +475,90 @@ export default function DashboardPage() {
       </section>
 
       <section className="space-y-5 md:space-y-6">
-        <SectionHeading eyebrow="Activity" title="Action items" description="Renewals, gigs, and recent payments." />
-        <div className="grid gap-4 md:gap-5 lg:grid-cols-3">
-          <Card plain className="lg:col-span-2 overflow-hidden">
-            <CardHeader className="space-y-2 px-5 pt-5 pb-2 sm:pt-5">
-              <CardTitle className="text-base font-semibold tracking-tight sm:text-lg flex items-center gap-2">
-                <Activity className="h-4 w-4 text-primary shrink-0" />
-                Expiring soon
-              </CardTitle>
-              <CardDescription className="text-sm sm:text-[15px]">Priority renewals.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2.5 px-5 pb-5 sm:pb-5">
-              {expiringList?.length ? (
-                expiringList.slice(0, 8).map((student: any) => {
-                  const status = getStatus(student.end_date);
-                  return (
-                    <ListRow key={student.id}>
-                      <div className="flex items-center gap-2.5 min-w-0 sm:gap-3">
-                        <Avatar className="h-8 w-8 bg-primary/10 text-primary text-[10px] sm:text-xs shrink-0">
-                          {getInitials(student.name)}
-                        </Avatar>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate">{student.name}</p>
-                          <p className="text-[11px] text-muted-foreground mt-0.5 sm:text-xs leading-snug">
-                            {student.batch_name || "Unassigned"} · {fmtDateShort(student.end_date)}
-                          </p>
-                        </div>
-                      </div>
-                      <Badge
-                        variant={status.key === "expired" ? "destructive" : status.key === "critical" ? "warning" : "secondary"}
-                        className="shrink-0 text-[10px] sm:text-xs"
+        <SectionHeading
+          eyebrow="Activity"
+          title="Action items"
+          description={
+            hasExpiringSoon ? "Freelance gigs and recent payments." : "Renewals, gigs, and recent payments."
+          }
+        />
+        <div
+          className={cn(
+            "grid gap-4 md:gap-5",
+            hasExpiringSoon ? "lg:grid-cols-1" : "lg:grid-cols-3",
+          )}
+        >
+          {!hasExpiringSoon ? (
+            <Card plain className="lg:col-span-2 overflow-hidden">
+              <CardHeader className="space-y-2 px-5 pt-5 pb-2 sm:pt-5">
+                <CardTitle className="text-base font-semibold tracking-tight sm:text-lg flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-primary shrink-0" />
+                  Expiring soon
+                </CardTitle>
+                <CardDescription className="text-sm sm:text-[15px]">Priority renewals.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2.5 px-5 pb-5 sm:pb-5">
+                {expiringList?.length ? (
+                  expiringList.slice(0, 8).map((student: any) => {
+                    const status = getStatus(student.end_date);
+                    const days = student.days_remaining;
+                    const dayLabel =
+                      days < 0 ? `Ended ${Math.abs(days)}d ago` : days === 0 ? "Ends today" : `${days}d left`;
+                    const ac = batchAccentColor(student.batch_id, batchesAccent);
+                    return (
+                      <Link
+                        key={student.id}
+                        href={`/students?student=${encodeURIComponent(student.id)}`}
+                        className="block rounded-xl outline-none ring-offset-background transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2"
                       >
-                        {status.label}
-                      </Badge>
-                    </ListRow>
-                  );
-                })
-              ) : (
-                <p className="text-xs text-muted-foreground py-2 sm:text-sm">Nothing urgent.</p>
-              )}
-            </CardContent>
-          </Card>
+                        <ListRow
+                          className="border-border/50 bg-muted/25"
+                          style={{
+                            borderLeftWidth: 3,
+                            borderLeftStyle: "solid",
+                            borderLeftColor: ac,
+                          }}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0 sm:gap-3">
+                            <Avatar
+                              className="h-8 w-8 shrink-0 border-2 text-[10px] font-semibold shadow-inner sm:text-xs"
+                              style={batchAvatarStyles(student.batch_id, batchesAccent)}
+                            >
+                              {getInitials(student.name)}
+                            </Avatar>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-foreground truncate">{student.name}</p>
+                              <p className="text-[11px] text-muted-foreground mt-0.5 sm:text-xs leading-snug">
+                                {student.batch_name || "Unassigned"} · {fmtDateShort(student.end_date)}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-2">
+                            <span className="text-[11px] font-medium tabular-nums text-muted-foreground sm:text-xs">{dayLabel}</span>
+                            <Badge
+                              variant={
+                                status.key === "expired"
+                                  ? "destructive"
+                                  : status.key === "critical"
+                                    ? "warning"
+                                    : "secondary"
+                              }
+                              className="shrink-0 text-[10px] sm:text-xs"
+                            >
+                              {status.label}
+                            </Badge>
+                            <ChevronRight className="h-4 w-4 text-muted-foreground opacity-70" aria-hidden />
+                          </div>
+                        </ListRow>
+                      </Link>
+                    );
+                  })
+                ) : (
+                  <p className="text-xs text-muted-foreground py-2 sm:text-sm">Nothing urgent.</p>
+                )}
+              </CardContent>
+            </Card>
+          ) : null}
 
           <Card plain className="overflow-hidden">
             <CardHeader className="flex flex-row items-start justify-between space-y-0 px-5 pt-5 pb-2 sm:pt-5">

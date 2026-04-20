@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { jsonDbError } from "@/lib/http-db-error";
-import { endDateOf } from "@/lib/utils";
+import { getStudentEndDate } from "@/lib/utils";
 import { addDays, differenceInCalendarDays, format, parseISO, startOfMonth, endOfMonth, subMonths, eachDayOfInterval, subDays } from "date-fns";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +28,7 @@ async function computeAnalytics(): Promise<NextResponse> {
       (SELECT COUNT(*) FROM students s WHERE s.batch_id = b.id) AS studentCount,
       (SELECT COALESCE(SUM(amount),0) FROM students s WHERE s.batch_id = b.id) AS revenue
     FROM batches b
+    ORDER BY b.created_at DESC
   `);
   const freelance = await d.all<any>(`
     SELECT *
@@ -36,7 +37,7 @@ async function computeAnalytics(): Promise<NextResponse> {
 
   // Enrich students with end_date & status
   const enriched = students.map((s) => {
-    const end_date = endDateOf(s.start_date, s.validity_days);
+    const end_date = getStudentEndDate(s);
     const days = differenceInCalendarDays(parseISO(end_date), now);
     let status: "active" | "expiring" | "critical" | "expired" = "active";
     if (days < 0) status = "expired";
@@ -49,6 +50,8 @@ async function computeAnalytics(): Promise<NextResponse> {
   const totalStudents = enriched.length;
   const activeStudents = enriched.filter((s) => s.status !== "expired").length;
   const expiredStudents = enriched.filter((s) => s.status === "expired").length;
+  const trialsActive = enriched.filter((s) => (s.enrollment_kind || "paid") === "trial" && s.status !== "expired").length;
+  const trialsExpired = enriched.filter((s) => (s.enrollment_kind || "paid") === "trial" && s.status === "expired").length;
   const expiringSoon = enriched.filter((s) => s.status === "critical" || s.status === "expiring").length;
   const totalRevenue = enriched.reduce((a, s) => a + (s.amount || 0), 0);
   const freelanceRevenue = freelance.reduce((a, g) => a + (g.amount || 0), 0);
@@ -144,11 +147,29 @@ async function computeAnalytics(): Promise<NextResponse> {
     batchDistribution.push({ name: "Unassigned", value: unassigned, revenue: 0 });
   }
 
-  // --- Status distribution ---
+  // --- Status distribution (trial = non-expired trials; paid-only for time buckets) ---
+  const isTrialEnrolment = (s: (typeof enriched)[0]) => (s.enrollment_kind || "paid") === "trial";
   const statusDistribution = [
-    { name: "Active", value: enriched.filter((s) => s.status === "active").length, key: "active" },
-    { name: "Expiring", value: enriched.filter((s) => s.status === "expiring").length, key: "expiring" },
-    { name: "Critical", value: enriched.filter((s) => s.status === "critical").length, key: "critical" },
+    {
+      name: "Trial",
+      value: enriched.filter((s) => isTrialEnrolment(s) && s.status !== "expired").length,
+      key: "trial",
+    },
+    {
+      name: "Active",
+      value: enriched.filter((s) => !isTrialEnrolment(s) && s.status === "active").length,
+      key: "active",
+    },
+    {
+      name: "Expiring",
+      value: enriched.filter((s) => !isTrialEnrolment(s) && s.status === "expiring").length,
+      key: "expiring",
+    },
+    {
+      name: "Critical",
+      value: enriched.filter((s) => !isTrialEnrolment(s) && s.status === "critical").length,
+      key: "critical",
+    },
     { name: "Expired", value: enriched.filter((s) => s.status === "expired").length, key: "expired" },
   ];
 
@@ -224,6 +245,8 @@ async function computeAnalytics(): Promise<NextResponse> {
       projectedNext30Days: next30Days,
       totalFreelanceGigs: freelance.length,
       avgFreelanceAmount: freelance.length ? Math.round(freelanceRevenue / freelance.length) : 0,
+      trialsActive,
+      trialsExpired,
     },
     monthlyRevenue,
     enrolmentTrend,
@@ -235,5 +258,7 @@ async function computeAnalytics(): Promise<NextResponse> {
     recentFreelance,
     validityDistribution,
     monthlyStudioFreelance,
+    /** Same order as GET /api/batches — drives `batchAccentColor` / trial tint on dashboard. */
+    batchesForAccent: batches.map((b) => ({ id: b.id })),
   });
 }
