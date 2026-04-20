@@ -1,32 +1,29 @@
 "use client";
-import * as React from "react";
-import { Moon, Sun, Monitor } from "lucide-react";
-import { useTheme } from "next-themes";
-import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
+import * as React from "react";
+import { Moon, Sun } from "lucide-react";
+import { useTheme } from "@/components/theme-provider";
+import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
+
+/** Light / dark switch — sets explicit theme (persists via settings API). */
 export function ThemeToggle() {
-  const { setTheme } = useTheme();
+  const { setTheme, resolvedTheme } = useTheme();
+  const dark = resolvedTheme === "dark";
+
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-9 w-9">
-          <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-          <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-          <span className="sr-only">Toggle theme</span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => setTheme("light")}>
-          <Sun className="h-4 w-4" /> Light
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("dark")}>
-          <Moon className="h-4 w-4" /> Dark
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("system")}>
-          <Monitor className="h-4 w-4" /> System
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <div
+      className="flex items-center gap-2 rounded-full border border-border/50 bg-muted/40 px-2.5 py-1.5 dark:bg-muted/25"
+      title="Appearance"
+    >
+      <Sun className={cn("h-4 w-4 shrink-0 transition-colors", dark ? "text-muted-foreground" : "text-foreground")} aria-hidden />
+      <Switch
+        checked={dark}
+        onCheckedChange={(on) => setTheme(on ? "dark" : "light")}
+        aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
+        className="data-[state=unchecked]:bg-muted"
+      />
+      <Moon className={cn("h-4 w-4 shrink-0 transition-colors", dark ? "text-foreground" : "text-muted-foreground")} aria-hidden />
+    </div>
   );
 }

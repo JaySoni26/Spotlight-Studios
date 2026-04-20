@@ -30,7 +30,7 @@ export function StatCard({ label, value, icon, change, changeLabel, subtext, acc
     "text-muted-foreground";
 
   return (
-    <Card className="relative overflow-hidden hover:shadow-md transition-shadow">
+    <Card className="relative overflow-hidden">
       <CardContent className="p-4 sm:p-5">
         <div className="flex items-center justify-between mb-3">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>

@@ -5,7 +5,9 @@ A full-stack Next.js 14 application for managing a dance studio: students, batch
 ## Stack
 
 - **Next.js 14** (App Router) + **TypeScript**
-- **SQLite** (via `better-sqlite3`) — embedded, zero-config database
+- **SQLite / LibSQL** data layer
+  - local: `better-sqlite3` (zero-config)
+  - hosted: LibSQL/Turso (shared globally)
 - **Tailwind CSS** + shadcn-style UI primitives
 - **Recharts** for charts & graphs
 - **next-themes** for light/dark mode
@@ -24,7 +26,19 @@ npm run dev
 
 Then open [http://localhost:3000](http://localhost:3000).
 
-The SQLite database file is created automatically at `data/spotlight.db` on first run. No configuration needed.
+### Database Modes
+
+This app supports 2 modes:
+
+1. **Local mode (default)**  
+   Uses `data/spotlight.db` on the current machine.
+
+2. **Hosted shared mode (recommended for teams/global usage)**  
+   Set:
+   - `TURSO_DATABASE_URL`
+   - `TURSO_AUTH_TOKEN`
+
+   When these env vars exist, the app uses hosted LibSQL automatically, so users across different machines/locations share the same data.
 
 ## Production
 
@@ -85,13 +99,16 @@ npm start
 | GET / PATCH / DELETE | `/api/students/[id]` | Get / update / delete student |
 | POST | `/api/students/[id]/renew` | Renew membership |
 | GET / POST | `/api/students/[id]/batch-change` | List history / change batch |
+| GET / PATCH | `/api/settings` | Read / update studio settings |
 
 ## Data Model
 
 ```
-batches: id, name, price, schedule, description, created_at
+batches: id, name, price, schedule, schedule_json, description, created_at
 students: id, name, phone, amount, start_date, validity_days, batch_id, notes, created_at
 batch_history: id, student_id, from_batch_id, to_batch_id, changed_at, note
+delete_events: id, entity_type, entity_id, entity_name, refund_amount, deleted_at
+studio_settings: key, value, updated_at
 ```
 
 Every batch change is automatically recorded to `batch_history` — including initial enrolment and batch-change dialog moves. This lets you see a student's entire batch journey.

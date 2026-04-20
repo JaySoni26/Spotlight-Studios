@@ -1,22 +1,27 @@
 "use client";
 import * as React from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Search, MoreHorizontal, UserPlus, Filter, X, Phone, ArrowRightLeft, CalendarCheck, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, MoreHorizontal, UserPlus, Filter, X, Phone, ArrowRightLeft, CalendarCheck, CalendarOff, Pencil, Trash2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { StudentFormDialog } from "@/components/student-form-dialog";
 import { BatchChangeDialog } from "@/components/batch-change-dialog";
 import { RenewDialog } from "@/components/renew-dialog";
-import { ConfirmDialog } from "@/components/confirm-dialog";
+import { DeleteGuardDialog } from "@/components/delete-guard-dialog";
+import { StudentDetailDialog } from "@/components/student-detail-dialog";
+import { StudentLeaveDialog } from "@/components/student-leave-dialog";
 import { api } from "@/lib/api";
-import { fmtDate, fmtINR, getInitials, getStatus } from "@/lib/utils";
+import { digitsOnlyPhone, fmtDate, fmtINR, formatINMobileDisplay, getInitials, getStatus } from "@/lib/utils";
+import { seriesColor } from "@/lib/chart-palette";
 
 function statusBadge(status: { key: string; label: string }) {
   const variantMap: Record<string, any> = {
@@ -25,10 +30,14 @@ function statusBadge(status: { key: string; label: string }) {
   return <Badge variant={variantMap[status.key]}>{status.label}</Badge>;
 }
 
-export default function StudentsPage() {
+function StudentsPageInner() {
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
   const [students, setStudents] = React.useState<any[]>([]);
   const [batches, setBatches] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [loadError, setLoadError] = React.useState<string | null>(null);
   const [query, setQuery] = React.useState("");
   const [batchFilter, setBatchFilter] = React.useState("all");
   const [statusFilter, setStatusFilter] = React.useState("all");
@@ -42,24 +51,52 @@ export default function StudentsPage() {
   const [renewStudent, setRenewStudent] = React.useState<any>(null);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [deleteStudent, setDeleteStudent] = React.useState<any>(null);
+  const [studentDetailId, setStudentDetailId] = React.useState<string | null>(null);
+  const [leaveOpen, setLeaveOpen] = React.useState(false);
+  const [leaveStudent, setLeaveStudent] = React.useState<any | null>(null);
 
   const load = React.useCallback(() => {
     setLoading(true);
+    setLoadError(null);
     Promise.all([api.listStudents(), api.listBatches()])
-      .then(([s, b]) => { setStudents(s); setBatches(b); })
-      .catch((e) => toast.error(e.message))
+      .then(([s, b]) => {
+        setStudents(s);
+        setBatches(b);
+      })
+      .catch((e) => {
+        const msg = e.message || "Could not load students";
+        setLoadError(msg);
+        toast.error(msg);
+      })
       .finally(() => setLoading(false));
   }, []);
 
   React.useEffect(() => { load(); }, [load]);
 
+  const spAdd = searchParams.get("add");
+  React.useEffect(() => {
+    if (spAdd !== "1" || loading) return;
+    router.replace(pathname, { scroll: false });
+    if (batches.length === 0) {
+      toast.error("Create a batch first");
+      return;
+    }
+    setEditingStudent(null);
+    setFormOpen(true);
+  }, [spAdd, loading, batches.length, pathname, router]);
+
   // Enrich + filter
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase();
+    const qDigits = digitsOnlyPhone(query);
     return students
       .map((s) => ({ ...s, status: getStatus(s.end_date) }))
       .filter((s) => {
-        if (q && !s.name.toLowerCase().includes(q) && !(s.phone || "").toLowerCase().includes(q)) return false;
+        const phoneDigits = s.phone ? digitsOnlyPhone(String(s.phone)) : "";
+        const phoneMatch =
+          !q ||
+          (qDigits.length > 0 ? phoneDigits.includes(qDigits) : (s.phone || "").toLowerCase().includes(q));
+        if (q && !s.name.toLowerCase().includes(q) && !phoneMatch) return false;
         if (batchFilter !== "all") {
           if (batchFilter === "none" && s.batch_id) return false;
           if (batchFilter !== "none" && s.batch_id !== batchFilter) return false;
@@ -104,10 +141,16 @@ export default function StudentsPage() {
     setDeleteOpen(true);
   };
 
-  const handleDelete = async () => {
+  const openLeave = (s: any) => {
+    setLeaveStudent(s);
+    setLeaveOpen(true);
+  };
+
+  const handleDelete = async ({ code, refundAmount }: { code: string; refundAmount: number }) => {
     if (!deleteStudent) return;
     try {
-      await api.deleteStudent(deleteStudent.id);
+      await api.deleteStudent(deleteStudent.id, { code, refund_amount: refundAmount });
+      setStudentDetailId(null);
       toast.success(`${deleteStudent.name} removed`);
       load();
     } catch (e: any) {
@@ -123,75 +166,125 @@ export default function StudentsPage() {
           <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground mb-2 flex items-center gap-2">
             <span className="h-px w-6 bg-primary" /> Roster
           </p>
-          <h1 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight italic text-primary">Students</h1>
-          <p className="text-sm text-muted-foreground mt-2">
-            {students.length} total · {filtered.length} showing
+          <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">Students</h1>
+          <p className="text-sm text-muted-foreground mt-2 max-w-lg leading-relaxed">
+            {students.length} members · {filtered.length} showing · tap a card for the full sheet.
           </p>
         </div>
-        <Button onClick={openAdd}>
-          <Plus className="h-4 w-4" /> Add Student
+        <Button onClick={openAdd} disabled={loading} className="rounded-full font-semibold shrink-0">
+          <Plus className="h-4 w-4" /> Add student
         </Button>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by name or phone…"
-            className="pl-9"
-          />
-          {query && (
-            <button onClick={() => setQuery("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-        <div className="flex gap-2">
-          <Select value={batchFilter} onValueChange={setBatchFilter}>
-            <SelectTrigger className="w-[160px]">
-              <SelectValue placeholder="Batch" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All batches</SelectItem>
-              <SelectItem value="none">Unassigned</SelectItem>
-              {batches.map((b) => (
-                <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[160px]">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All status</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="expiring_soon">Expiring soon</SelectItem>
-              <SelectItem value="critical">Critical (≤3d)</SelectItem>
-              <SelectItem value="expired">Expired</SelectItem>
-            </SelectContent>
-          </Select>
-          {activeFilters > 0 && (
-            <Button variant="ghost" size="icon" onClick={() => { setBatchFilter("all"); setStatusFilter("all"); }} title="Clear filters">
-              <X className="h-4 w-4" />
+      {loadError ? (
+        <Card className="border-destructive/35 bg-destructive/5">
+          <CardContent className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <p className="text-sm text-destructive leading-relaxed">{loadError}</p>
+            <Button variant="outline" size="sm" className="shrink-0" onClick={() => load()}>
+              Try again
             </Button>
-          )}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {/* Filters */}
+      <div className="rounded-2xl border border-border/55 bg-card/40 p-3 shadow-sm backdrop-blur-sm sm:p-4 dark:bg-card/30">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3">
+          <div className="relative flex-1 min-w-0">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search name or 10-digit mobile…"
+              className="h-11 rounded-xl border-border/70 bg-background pl-10 pr-9 shadow-none"
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label="Clear search"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          <div className="flex flex-nowrap gap-2 sm:shrink-0">
+            <Select value={batchFilter} onValueChange={setBatchFilter}>
+              <SelectTrigger className="h-11 w-full min-w-[9.5rem] rounded-xl border-border/70 sm:w-[160px]">
+                <span className="flex min-w-0 items-center gap-2">
+                  <Filter className="h-3.5 w-3.5 shrink-0 opacity-60" aria-hidden />
+                  <SelectValue placeholder="Batch" />
+                </span>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All batches</SelectItem>
+                <SelectItem value="none">Unassigned</SelectItem>
+                {batches.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>
+                    {b.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="h-11 w-full min-w-[9.5rem] rounded-xl border-border/70 sm:w-[160px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="expiring_soon">Expiring soon</SelectItem>
+                <SelectItem value="critical">Critical (≤3d)</SelectItem>
+                <SelectItem value="expired">Expired</SelectItem>
+              </SelectContent>
+            </Select>
+            {activeFilters > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-11 rounded-xl border-dashed"
+                onClick={() => {
+                  setBatchFilter("all");
+                  setStatusFilter("all");
+                }}
+              >
+                Clear filters
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Content */}
-      {loading ? (
-        <div className="space-y-2">
-          {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16" />)}
+      {loading && students.length === 0 && batches.length === 0 ? (
+        <div className="space-y-4">
+          <div className="flex flex-wrap gap-2">
+            <Skeleton className="h-10 w-full max-w-md rounded-xl" />
+            <Skeleton className="h-10 w-[160px] rounded-xl" />
+            <Skeleton className="h-10 w-[160px] rounded-xl" />
+          </div>
+          <div className="w-full space-y-2 max-w-2xl">
+            {[...Array(6)].map((_, i) => (
+              <Skeleton key={i} className="h-16 rounded-xl" />
+            ))}
+          </div>
+        </div>
+      ) : loading ? (
+        <div className="flex flex-col items-center gap-3 py-6 text-muted-foreground">
+          <Spinner className="text-2xl" label="Refreshing" />
+          <p className="text-sm">Refreshing…</p>
+          <div className="w-full space-y-2 max-w-2xl">
+            {[...Array(4)].map((_, i) => (
+              <Skeleton key={i} className="h-16" />
+            ))}
+          </div>
         </div>
       ) : filtered.length === 0 ? (
         <Card>
           <CardContent className="py-16 text-center">
             <div className="text-3xl opacity-30 mb-2">○</div>
-            <h3 className="font-display italic text-xl text-muted-foreground mb-1">
+            <h3 className="text-xl font-semibold tracking-tight text-muted-foreground mb-1">
               {students.length === 0 ? "No students yet" : "No matches"}
             </h3>
             <p className="text-sm text-muted-foreground">
@@ -207,7 +300,7 @@ export default function StudentsPage() {
       ) : (
         <>
           {/* Desktop table */}
-          <Card className="hidden md:block">
+          <Card className="hidden overflow-hidden rounded-2xl border-border/55 shadow-sm md:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -223,7 +316,11 @@ export default function StudentsPage() {
               </TableHeader>
               <TableBody>
                 {filtered.map((s) => (
-                  <TableRow key={s.id}>
+                  <TableRow
+                    key={s.id}
+                    className="cursor-pointer hover:bg-muted/40"
+                    onClick={() => setStudentDetailId(s.id)}
+                  >
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar className="bg-primary/10 text-primary">{getInitials(s.name)}</Avatar>
@@ -233,7 +330,9 @@ export default function StudentsPage() {
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">{s.phone || "—"}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm tabular-nums">
+                      {s.phone ? formatINMobileDisplay(digitsOnlyPhone(String(s.phone))) : "—"}
+                    </TableCell>
                     <TableCell className="text-sm">
                       {s.batch_name ? (
                         <Badge variant="outline">{s.batch_name}</Badge>
@@ -241,7 +340,7 @@ export default function StudentsPage() {
                         <span className="text-muted-foreground italic">Unassigned</span>
                       )}
                     </TableCell>
-                    <TableCell className="font-display italic text-primary text-right">₹{fmtINR(s.amount)}</TableCell>
+                    <TableCell className="font-semibold text-primary text-right">₹{fmtINR(s.amount)}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{fmtDate(s.start_date)}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{fmtDate(s.end_date)}</TableCell>
                     <TableCell>{statusBadge(s.status)}</TableCell>
@@ -251,7 +350,9 @@ export default function StudentsPage() {
                         onEdit={openEdit}
                         onBatchChange={openBatchChange}
                         onRenew={openRenew}
+                        onLeave={openLeave}
                         onDelete={openDelete}
+                        stopRowClick
                       />
                     </TableCell>
                   </TableRow>
@@ -261,45 +362,87 @@ export default function StudentsPage() {
           </Card>
 
           {/* Mobile cards */}
-          <div className="md:hidden space-y-2">
-            {filtered.map((s) => (
-              <Card key={s.id} className="overflow-hidden">
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                    <Avatar className="bg-primary/10 text-primary flex-shrink-0">{getInitials(s.name)}</Avatar>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="font-medium truncate">{s.name}</p>
-                          {s.phone && (
-                            <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
-                              <Phone className="h-3 w-3" /> {s.phone}
-                            </p>
+          <div className="md:hidden space-y-4">
+            {filtered.map((s, idx) => {
+              const c = seriesColor(idx);
+              const phoneDisp = s.phone ? formatINMobileDisplay(digitsOnlyPhone(String(s.phone))) : "";
+              return (
+                <article
+                  key={s.id}
+                  role="button"
+                  tabIndex={0}
+                  className="cursor-pointer overflow-hidden rounded-xl border border-border/45 bg-muted/10 text-card-foreground shadow-none ring-1 ring-border/25 transition-all duration-200 hover:bg-muted/20 hover:ring-primary/20 hover:shadow-sm active:scale-[0.99] dark:bg-card/35 dark:ring-border/20"
+                  onClick={() => setStudentDetailId(s.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setStudentDetailId(s.id);
+                    }
+                  }}
+                >
+                  <div
+                    className="h-1 w-full"
+                    style={{
+                      background: `linear-gradient(90deg, ${c}, color-mix(in srgb, ${c} 55%, hsl(var(--primary))) 52%, color-mix(in srgb, ${c} 25%, transparent) 100%)`,
+                    }}
+                    aria-hidden
+                  />
+                  <div className="space-y-3 p-4">
+                    <div className="flex items-start gap-3">
+                      <Avatar className="h-12 w-12 shrink-0 rounded-2xl border border-border/40 bg-primary/10 text-sm font-semibold text-primary shadow-inner">
+                        {getInitials(s.name)}
+                      </Avatar>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Student</p>
+                            <h3 className="mt-0.5 truncate text-[17px] font-semibold leading-snug tracking-tight">{s.name}</h3>
+                            {phoneDisp ? (
+                              <p className="mt-1 flex items-center gap-1.5 text-[13px] text-muted-foreground tabular-nums">
+                                <Phone className="h-3.5 w-3.5 shrink-0 opacity-80" />
+                                <span className="truncate">{phoneDisp}</span>
+                              </p>
+                            ) : null}
+                          </div>
+                          <div className="flex shrink-0 items-start gap-2">
+                            <div className="scale-90 origin-top-right [&_.rounded-full]:shadow-sm">{statusBadge(s.status)}</div>
+                            <StudentActions
+                              student={s}
+                              onEdit={openEdit}
+                              onBatchChange={openBatchChange}
+                              onRenew={openRenew}
+                              onLeave={openLeave}
+                              onDelete={openDelete}
+                              stopRowClick
+                            />
+                          </div>
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {s.batch_name ? (
+                            <Badge variant="outline" className="text-[10px] font-medium">
+                              {s.batch_name}
+                            </Badge>
+                          ) : (
+                            <Badge variant="muted" className="text-[10px]">
+                              Unassigned
+                            </Badge>
                           )}
                         </div>
-                        <StudentActions
-                          student={s}
-                          onEdit={openEdit}
-                          onBatchChange={openBatchChange}
-                          onRenew={openRenew}
-                          onDelete={openDelete}
-                        />
-                      </div>
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {s.batch_name && <Badge variant="outline" className="text-[10px]">{s.batch_name}</Badge>}
-                        {statusBadge(s.status)}
-                      </div>
-                      <div className="mt-2 flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">
-                          {fmtDate(s.start_date)} → {fmtDate(s.end_date)}
-                        </span>
-                        <span className="font-display italic text-primary">₹{fmtINR(s.amount)}</span>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border/50 pt-3 text-[13px] text-muted-foreground">
+                          <span className="font-medium tabular-nums text-primary">₹{fmtINR(s.amount)}</span>
+                          <span className="text-border" aria-hidden>
+                            ·
+                          </span>
+                          <span>
+                            {fmtDate(s.start_date)} → {fmtDate(s.end_date)}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
+                </article>
+              );
+            })}
           </div>
         </>
       )}
@@ -326,30 +469,81 @@ export default function StudentsPage() {
         batches={batches}
         onSaved={load}
       />
-      <ConfirmDialog
+      <StudentDetailDialog
+        open={!!studentDetailId}
+        onOpenChange={(v) => { if (!v) setStudentDetailId(null); }}
+        studentId={studentDetailId}
+        onEdit={(st) => openEdit(st)}
+        onRenew={(st) => openRenew(st)}
+        onBatchChange={(st) => openBatchChange(st)}
+        onLeave={(st) => openLeave(st)}
+        onDelete={(st) => openDelete(st)}
+      />
+      <StudentLeaveDialog
+        open={leaveOpen}
+        onOpenChange={(v) => {
+          setLeaveOpen(v);
+          if (!v) setLeaveStudent(null);
+        }}
+        student={leaveStudent}
+        onSaved={load}
+      />
+      <DeleteGuardDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         title="Delete student?"
-        description={deleteStudent ? `This will permanently remove ${deleteStudent.name}. This can't be undone.` : ""}
+        description={deleteStudent ? `This will permanently remove ${deleteStudent.name}. Enter refund and special code to continue.` : ""}
         confirmLabel="Delete"
-        variant="destructive"
+        requireRefund
         onConfirm={handleDelete}
       />
     </div>
   );
 }
 
-function StudentActions({ student, onEdit, onBatchChange, onRenew, onDelete }: any) {
+export default function StudentsPage() {
+  return (
+    <React.Suspense
+      fallback={
+        <div className="space-y-4 py-4">
+          <Skeleton className="h-10 w-48 rounded-lg" />
+          <Skeleton className="h-4 w-2/3 max-w-md" />
+          <div className="flex flex-wrap gap-2">
+            <Skeleton className="h-10 w-full max-w-md rounded-xl" />
+            <Skeleton className="h-10 w-40 rounded-xl" />
+          </div>
+          <div className="space-y-2 max-w-2xl">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <Skeleton key={i} className="h-16 rounded-xl" />
+            ))}
+          </div>
+        </div>
+      }
+    >
+      <StudentsPageInner />
+    </React.Suspense>
+  );
+}
+
+function StudentActions({ student, onEdit, onBatchChange, onRenew, onLeave, onDelete, stopRowClick }: any) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-8 w-8">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={stopRowClick ? (e) => e.stopPropagation() : undefined}
+        >
           <MoreHorizontal className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48">
+      <DropdownMenuContent align="end" className="w-48" onClick={stopRowClick ? (e) => e.stopPropagation() : undefined}>
         <DropdownMenuItem onClick={() => onRenew(student)}>
           <CalendarCheck className="h-4 w-4" /> Renew membership
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => onLeave(student)}>
+          <CalendarOff className="h-4 w-4" /> Record leave
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => onBatchChange(student)}>
           <ArrowRightLeft className="h-4 w-4" /> Change batch

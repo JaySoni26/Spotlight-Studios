@@ -1,25 +1,38 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { jsonDbError } from "@/lib/http-db-error";
 import { endDateOf } from "@/lib/utils";
 import { addDays, differenceInCalendarDays, format, parseISO, startOfMonth, endOfMonth, subMonths, eachDayOfInterval, subDays } from "date-fns";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const d = db();
+  try {
+    return await computeAnalytics();
+  } catch (e) {
+    return jsonDbError(e, "[GET /api/analytics]");
+  }
+}
+
+async function computeAnalytics(): Promise<NextResponse> {
+  const d = await db();
   const now = new Date();
 
-  const students = d.prepare(`
+  const students = await d.all<any>(`
     SELECT s.*, b.name AS batch_name
     FROM students s LEFT JOIN batches b ON b.id = s.batch_id
-  `).all() as any[];
+  `);
 
-  const batches = d.prepare(`
+  const batches = await d.all<any>(`
     SELECT b.*, 
       (SELECT COUNT(*) FROM students s WHERE s.batch_id = b.id) AS studentCount,
       (SELECT COALESCE(SUM(amount),0) FROM students s WHERE s.batch_id = b.id) AS revenue
     FROM batches b
-  `).all() as any[];
+  `);
+  const freelance = await d.all<any>(`
+    SELECT *
+    FROM freelance_gigs
+  `);
 
   // Enrich students with end_date & status
   const enriched = students.map((s) => {
@@ -38,6 +51,8 @@ export async function GET() {
   const expiredStudents = enriched.filter((s) => s.status === "expired").length;
   const expiringSoon = enriched.filter((s) => s.status === "critical" || s.status === "expiring").length;
   const totalRevenue = enriched.reduce((a, s) => a + (s.amount || 0), 0);
+  const freelanceRevenue = freelance.reduce((a, g) => a + (g.amount || 0), 0);
+  const combinedRevenue = totalRevenue + freelanceRevenue;
   const avgFee = totalStudents > 0 ? Math.round(totalRevenue / totalStudents) : 0;
 
   // This month / last month revenue (by start_date)
@@ -54,7 +69,22 @@ export async function GET() {
 
   const thisMonthRevenue = sumInRange(thisMonthStart, thisMonthEnd);
   const lastMonthRevenue = sumInRange(lastMonthStart, lastMonthEnd);
-  const revenueGrowth = lastMonthRevenue > 0 ? ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 : (thisMonthRevenue > 0 ? 100 : 0);
+  const thisMonthFreelance = freelance
+    .filter((g) => {
+      const d = new Date(g.created_at);
+      return d >= thisMonthStart && d <= thisMonthEnd;
+    })
+    .reduce((a, g) => a + (g.amount || 0), 0);
+  const lastMonthFreelance = freelance
+    .filter((g) => {
+      const d = new Date(g.created_at);
+      return d >= lastMonthStart && d <= lastMonthEnd;
+    })
+    .reduce((a, g) => a + (g.amount || 0), 0);
+  const thisMonthCombined = thisMonthRevenue + thisMonthFreelance;
+  const lastMonthCombined = lastMonthRevenue + lastMonthFreelance;
+  const revenueGrowth =
+    lastMonthCombined > 0 ? ((thisMonthCombined - lastMonthCombined) / lastMonthCombined) * 100 : thisMonthCombined > 0 ? 100 : 0;
 
   // New students this month / last month
   const newThisMonth = enriched.filter((s) => {
@@ -67,14 +97,23 @@ export async function GET() {
   }).length;
 
   // --- Revenue last 6 months (chart) ---
-  const monthlyRevenue: Array<{ label: string; revenue: number; students: number }> = [];
+  const monthlyRevenue: Array<{ label: string; revenue: number; students: number; studio: number; freelanceOnly: number }> = [];
   for (let i = 5; i >= 0; i--) {
     const monthDate = subMonths(now, i);
     const from = startOfMonth(monthDate);
     const to = endOfMonth(monthDate);
+    const studioOnly = sumInRange(from, to);
+    const freelanceOnly = freelance
+      .filter((g) => {
+        const d = new Date(g.created_at);
+        return d >= from && d <= to;
+      })
+      .reduce((a, g) => a + (g.amount || 0), 0);
     monthlyRevenue.push({
       label: format(monthDate, "MMM"),
-      revenue: sumInRange(from, to),
+      revenue: studioOnly + freelanceOnly,
+      studio: studioOnly,
+      freelanceOnly,
       students: enriched.filter((s) => {
         const d = parseISO(s.start_date);
         return d >= from && d <= to;
@@ -136,6 +175,9 @@ export async function GET() {
       amount: s.amount,
       created_at: s.created_at,
     }));
+  const recentFreelance = [...freelance]
+    .sort((a, b) => b.created_at - a.created_at)
+    .slice(0, 5);
 
   // --- Projected revenue (next 30 days: expiring renewals potential) ---
   const next30Days = enriched
@@ -153,6 +195,12 @@ export async function GET() {
   });
   const validityDistribution = Object.entries(validityBuckets).map(([label, count]) => ({ label, count }));
 
+  const monthlyStudioFreelance = monthlyRevenue.map(({ label, studio, freelanceOnly }) => ({
+    label,
+    studio,
+    freelance: freelanceOnly,
+  }));
+
   return NextResponse.json({
     kpis: {
       totalStudents,
@@ -160,14 +208,22 @@ export async function GET() {
       expiredStudents,
       expiringSoon,
       totalRevenue,
+      freelanceRevenue,
+      combinedRevenue,
       avgFee,
       thisMonthRevenue,
       lastMonthRevenue,
+      thisMonthFreelance,
+      lastMonthFreelance,
+      thisMonthCombined,
+      lastMonthCombined,
       revenueGrowth: Math.round(revenueGrowth * 10) / 10,
       newThisMonth,
       newLastMonth,
       totalBatches: batches.length,
       projectedNext30Days: next30Days,
+      totalFreelanceGigs: freelance.length,
+      avgFreelanceAmount: freelance.length ? Math.round(freelanceRevenue / freelance.length) : 0,
     },
     monthlyRevenue,
     enrolmentTrend,
@@ -176,6 +232,8 @@ export async function GET() {
     expiringList,
     topBatches,
     recentActivity,
+    recentFreelance,
     validityDistribution,
+    monthlyStudioFreelance,
   });
 }

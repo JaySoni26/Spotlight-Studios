@@ -16,9 +16,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   try {
     const body = await req.json();
     const parsed = RenewInput.parse(body);
-    const d = db();
+    const d = await db();
 
-    const student = d.prepare("SELECT * FROM students WHERE id = ?").get(params.id) as any;
+    const student = await d.get<any>("SELECT * FROM students WHERE id = ?", [params.id]);
     if (!student) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     const currentEnd = endDateOf(student.start_date, student.validity_days);
@@ -43,15 +43,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const newStartIso = format(newStart, "yyyy-MM-dd");
     const newAmount = student.amount + parsed.additional_amount;
 
-    d.prepare(`
+    await d.run(`
       UPDATE students SET start_date = ?, validity_days = ?, amount = ? WHERE id = ?
-    `).run(newStartIso, newValidity, newAmount, params.id);
+    `, [newStartIso, newValidity, newAmount, params.id]);
 
-    const row = d.prepare(`
+    const row = await d.get<any>(`
       SELECT s.*, b.name AS batch_name
       FROM students s LEFT JOIN batches b ON b.id = s.batch_id
       WHERE s.id = ?
-    `).get(params.id) as any;
+    `, [params.id]);
 
     return NextResponse.json({ ...row, end_date: endDateOf(row.start_date, row.validity_days) });
   } catch (e: any) {

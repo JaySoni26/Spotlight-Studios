@@ -1,6 +1,7 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns";
+import type { DbClient } from "@/lib/db";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -30,6 +31,19 @@ export const fmtDateShort = (iso?: string | null) => {
   try { return format(parseISO(iso), "d MMM"); } catch { return "—"; }
 };
 
+/** Indian mobile: exactly 10 digits, store digits-only; display as XXXXX XXXXX */
+export const IN_MOBILE_DIGITS = 10;
+
+export function digitsOnlyPhone(input: string): string {
+  return (input ?? "").replace(/\D/g, "").slice(0, IN_MOBILE_DIGITS);
+}
+
+export function formatINMobileDisplay(digitsOrRaw: string): string {
+  const d = digitsOnlyPhone(digitsOrRaw);
+  if (d.length <= 5) return d;
+  return `${d.slice(0, 5)} ${d.slice(5)}`;
+}
+
 export const endDateOf = (startDate: string, validityDays: number) => {
   return format(addDays(parseISO(startDate), validityDays), "yyyy-MM-dd");
 };
@@ -56,3 +70,37 @@ export const getInitials = (name: string) => {
 };
 
 export const today = () => format(new Date(), "yyyy-MM-dd");
+
+const weekdayMap: Record<string, string> = {
+  mon: "Mon",
+  tue: "Tue",
+  wed: "Wed",
+  thu: "Thu",
+  fri: "Fri",
+  sat: "Sat",
+  sun: "Sun",
+};
+
+export const formatBatchScheduleLabel = (scheduleJson?: string | null, fallback?: string | null) => {
+  if (scheduleJson) {
+    try {
+      const entries = JSON.parse(scheduleJson) as Array<{ day: keyof typeof weekdayMap; time: string }>;
+      if (Array.isArray(entries) && entries.length > 0) {
+        return entries
+          .map((entry) => `${weekdayMap[entry.day] ?? entry.day} ${entry.time}`)
+          .join(" · ");
+      }
+    } catch {
+      // Ignore parse error and fallback to old schedule value.
+    }
+  }
+  return fallback ?? null;
+};
+
+export const verifyDeleteCode = async (d: DbClient, code: string) => {
+  const row = (await d.get<{ value: string }>("SELECT value FROM studio_settings WHERE key = 'delete_admin_code'")) as
+    | { value: string }
+    | undefined;
+  const expected = row?.value || "0000";
+  return code === expected;
+};

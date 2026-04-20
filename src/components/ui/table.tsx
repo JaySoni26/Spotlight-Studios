@@ -31,7 +31,11 @@ TableFooter.displayName = "TableFooter";
 
 const TableRow = React.forwardRef<HTMLTableRowElement, React.HTMLAttributes<HTMLTableRowElement>>(
   ({ className, ...props }, ref) => (
-    <tr ref={ref} className={cn("border-b transition-colors hover:bg-muted/40 data-[state=selected]:bg-muted", className)} {...props} />
+    <tr
+      ref={ref}
+      className={cn("border-b border-border/50 transition-colors hover:bg-muted/35 data-[state=selected]:bg-muted", className)}
+      {...props}
+    />
   ),
 );
 TableRow.displayName = "TableRow";

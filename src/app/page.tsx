@@ -1,325 +1,420 @@
 "use client";
 import * as React from "react";
 import Link from "next/link";
-import { Users, Wallet, TrendingUp, AlertTriangle, Calendar, UserPlus, ChevronRight, Activity, PieChart, Target } from "lucide-react";
+import { Users, Wallet, TrendingUp, AlertTriangle, Calendar, BriefcaseBusiness, ArrowRight, Activity } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Avatar } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { StatCard } from "@/components/stat-card";
 import {
-  RevenueAreaChart, EnrolmentLineChart, BatchPieChart,
-  StatusBarChart, TopBatchesBarChart, ValidityBarChart,
+  RevenueAreaChart,
+  BatchPieChart,
+  StatusBarChart,
+  EnrolmentLineChart,
+  TopBatchesBarChart,
+  ValidityBarChart,
+  StudioFreelanceStackedBarChart,
+  MonthlyEnrolmentsBarChart,
 } from "@/components/charts";
 import { api } from "@/lib/api";
-import { fmtDate, fmtDateShort, fmtINR, getInitials, getStatus } from "@/lib/utils";
+import { cn, fmtDateShort, fmtINR, getInitials, getStatus } from "@/lib/utils";
+import { Avatar } from "@/components/ui/avatar";
 
-function getTimeGreeting() {
-  const h = new Date().getHours();
-  if (h < 12) return "morning";
-  if (h < 17) return "afternoon";
-  return "evening";
+function SectionHeading({
+  eyebrow,
+  title,
+  description,
+}: {
+  eyebrow: string;
+  title: string;
+  description?: string;
+}) {
+  return (
+    <header className="space-y-1.5">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{eyebrow}</p>
+      <h2 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl sm:tracking-tight">{title}</h2>
+      {description ? (
+        <p className="text-sm text-muted-foreground leading-relaxed sm:text-base max-w-2xl">{description}</p>
+      ) : null}
+    </header>
+  );
 }
 
-function statusBadge(status: { key: string; label: string; days: number }) {
-  const variantMap: Record<string, any> = {
-    active: "success", expiring: "warning", critical: "danger", expired: "muted",
-  };
-  return <Badge variant={variantMap[status.key]}>{status.label}</Badge>;
+function ChartCard({
+  title,
+  description,
+  children,
+  className,
+}: {
+  title: string;
+  description: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <Card plain className={cn("overflow-hidden flex flex-col", className)}>
+      <CardHeader className="space-y-2 shrink-0 px-5 pt-5 pb-1 sm:pt-5 sm:pb-1.5">
+        <CardTitle className="text-base font-semibold tracking-tight sm:text-lg">{title}</CardTitle>
+        <CardDescription className="text-sm leading-relaxed sm:text-[15px]">{description}</CardDescription>
+      </CardHeader>
+      <CardContent className="px-5 pb-5 pt-4 sm:pb-5 sm:pt-5 flex-1 flex flex-col min-h-0">
+        <div className="w-full min-h-0 flex-1">{children}</div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function KpiCard({ title, value, subtitle, icon }: { title: string; value: React.ReactNode; subtitle: string; icon: React.ReactNode }) {
+  return (
+    <Card className="h-full border-border/70">
+      <CardHeader className="space-y-2.5 pb-2 pt-5 px-5 sm:space-y-3 sm:pt-5 sm:px-5">
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground leading-snug pr-1 sm:text-[11px]">
+            {title}
+          </p>
+          <div className="text-muted-foreground/80 shrink-0 [&_svg]:size-[15px] sm:[&_svg]:size-4">{icon}</div>
+        </div>
+        <div className="text-2xl font-semibold tabular-nums tracking-tight text-foreground leading-none sm:text-[1.75rem]">{value}</div>
+      </CardHeader>
+      <CardContent className="pt-0 px-5 pb-5 sm:px-5 sm:pb-5">
+        <p className="text-xs text-muted-foreground leading-snug sm:text-sm">{subtitle}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ListRow({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-muted/30 px-3 py-2.5 sm:px-3.5",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
 }
 
 export default function DashboardPage() {
   const [data, setData] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
+  const [loadError, setLoadError] = React.useState<string | null>(null);
 
   const load = React.useCallback(() => {
     setLoading(true);
-    api.analytics().then((d) => { setData(d); setLoading(false); }).catch(() => setLoading(false));
+    setLoadError(null);
+    api
+      .analytics()
+      .then((d) => {
+        setData(d);
+      })
+      .catch((e) => {
+        setData(null);
+        setLoadError(e.message || "Could not load dashboard");
+      })
+      .finally(() => setLoading(false));
   }, []);
 
-  React.useEffect(() => { load(); }, [load]);
+  React.useEffect(() => {
+    load();
+  }, [load]);
 
   if (loading && !data) return <DashboardSkeleton />;
-  if (!data) return <div>Failed to load</div>;
+  if (!data && loadError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 px-4 text-center max-w-md mx-auto">
+        <p className="text-destructive text-sm font-medium leading-relaxed mb-2">{loadError}</p>
+        <p className="text-sm text-muted-foreground mb-6">Check your connection and database configuration.</p>
+        <Button onClick={() => load()} variant="default">
+          Retry
+        </Button>
+      </div>
+    );
+  }
+  if (!data) {
+    return <DashboardSkeleton />;
+  }
 
-  const { kpis, monthlyRevenue, enrolmentTrend, batchDistribution, statusDistribution, expiringList, topBatches, recentActivity, validityDistribution } = data;
+  const {
+    kpis,
+    monthlyRevenue,
+    batchDistribution,
+    statusDistribution,
+    topBatches,
+    recentFreelance,
+    recentActivity,
+    expiringList,
+    enrolmentTrend,
+    validityDistribution,
+    monthlyStudioFreelance,
+  } = data;
   const isEmpty = kpis.totalStudents === 0 && kpis.totalBatches === 0;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground mb-2 flex items-center gap-2">
-            <span className="h-px w-6 bg-primary" /> Overview
-          </p>
-          <h1 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight">
-            Good {getTimeGreeting()}, <span className="italic text-primary">Spotlight</span>
-          </h1>
-          <p className="text-sm text-muted-foreground mt-2">
-            Here&rsquo;s what&rsquo;s happening at the studio · {fmtDate(new Date().toISOString())}
-          </p>
+    <div className="space-y-9 md:space-y-11">
+      <section className="space-y-4 md:space-y-5">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground px-0.5">Overview</p>
+        <div className="grid grid-cols-2 gap-4 xl:grid-cols-4 md:gap-4">
+          <KpiCard
+            title="Combined revenue"
+            value={<>₹{fmtINR(kpis.combinedRevenue)}</>}
+            subtitle={`Studio ₹${fmtINR(kpis.totalRevenue)} + freelance ₹${fmtINR(kpis.freelanceRevenue)}`}
+            icon={<Wallet className="h-4 w-4" />}
+          />
+          <KpiCard
+            title="This month"
+            value={<>₹{fmtINR(kpis.thisMonthCombined)}</>}
+            subtitle={`${kpis.revenueGrowth}% vs last month`}
+            icon={<TrendingUp className="h-4 w-4" />}
+          />
+          <KpiCard
+            title="Students"
+            value={kpis.totalStudents}
+            subtitle={`${kpis.activeStudents} active · ${kpis.expiringSoon} expiring`}
+            icon={<Users className="h-4 w-4" />}
+          />
+          <KpiCard
+            title="Freelance gigs"
+            value={kpis.totalFreelanceGigs}
+            subtitle={`Avg ₹${fmtINR(kpis.avgFreelanceAmount)}`}
+            icon={<BriefcaseBusiness className="h-4 w-4" />}
+          />
+          <KpiCard
+            title="Studio (month)"
+            value={<>₹{fmtINR(kpis.thisMonthRevenue)}</>}
+            subtitle={`Prior ₹${fmtINR(kpis.lastMonthRevenue)}`}
+            icon={<Calendar className="h-4 w-4" />}
+          />
+          <KpiCard
+            title="Freelance (month)"
+            value={<>₹{fmtINR(kpis.thisMonthFreelance)}</>}
+            subtitle={`Prior ₹${fmtINR(kpis.lastMonthFreelance)}`}
+            icon={<BriefcaseBusiness className="h-4 w-4" />}
+          />
+          <KpiCard
+            title="Avg fee"
+            value={<>₹{fmtINR(kpis.avgFee)}</>}
+            subtitle={`${kpis.newThisMonth} new this month`}
+            icon={<Users className="h-4 w-4" />}
+          />
+          <KpiCard
+            title="30-day renewals"
+            value={<>₹{fmtINR(kpis.projectedNext30Days)}</>}
+            subtitle="Near-expiry potential"
+            icon={<AlertTriangle className="h-4 w-4" />}
+          />
         </div>
-        <div className="flex gap-2">
-          <Button asChild variant="outline" size="sm">
-            <Link href="/batches"><Calendar className="h-4 w-4" /> Batches</Link>
-          </Button>
-          <Button asChild size="sm">
-            <Link href="/students"><UserPlus className="h-4 w-4" /> Add Student</Link>
-          </Button>
-        </div>
-      </div>
+      </section>
 
       {isEmpty && (
-        <Card className="border-primary/20 bg-primary/5">
-          <CardContent className="p-8 text-center">
-            <h3 className="font-display italic text-2xl text-primary mb-2">Welcome to Spotlight</h3>
-            <p className="text-muted-foreground mb-4 max-w-md mx-auto">
-              Let&rsquo;s set you up. Create your first batch, then enrol students.
+        <Card className="border-dashed border-border/70">
+          <CardContent className="py-8 text-center px-5 sm:py-10 sm:px-6">
+            <h3 className="text-lg font-semibold tracking-tight sm:text-xl">Add a batch or freelance gig</h3>
+            <p className="text-sm text-muted-foreground mt-2 mb-5 max-w-sm mx-auto leading-relaxed sm:text-base">
+              Charts and activity will appear here once you have data.
             </p>
-            <div className="flex justify-center gap-2">
-              <Button asChild><Link href="/batches">Create Batch</Link></Button>
-              <Button asChild variant="outline"><Link href="/students">Add Student</Link></Button>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button asChild variant="outline" size="sm" className="rounded-full">
+                <Link href="/batches">Create batch</Link>
+              </Button>
+              <Button asChild size="sm" className="rounded-full">
+                <Link href="/freelance">Add gig</Link>
+              </Button>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Top KPI Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <StatCard
-          label="Total Students"
-          value={kpis.totalStudents}
-          icon={<Users className="h-4 w-4" />}
-          subtext={`${kpis.activeStudents} active · ${kpis.expiredStudents} expired`}
+      <section className="space-y-5 md:space-y-6">
+        <SectionHeading
+          eyebrow="Revenue"
+          title="Income & membership"
+          description="Six-month trend and how students are distributed by status."
         />
-        <StatCard
-          label="Total Revenue"
-          value={<>₹{fmtINR(kpis.totalRevenue)}</>}
-          icon={<Wallet className="h-4 w-4" />}
-          subtext={`Avg ₹${fmtINR(kpis.avgFee)}/student`}
-          accent="primary"
-        />
-        <StatCard
-          label="This Month"
-          value={<>₹{fmtINR(kpis.thisMonthRevenue)}</>}
-          icon={<TrendingUp className="h-4 w-4" />}
-          change={kpis.revenueGrowth}
-          changeLabel="vs last month"
-        />
-        <StatCard
-          label="Expiring Soon"
-          value={kpis.expiringSoon}
-          icon={<AlertTriangle className="h-4 w-4" />}
-          subtext="in next 10 days"
-          accent={kpis.expiringSoon > 0 ? "warning" : "default"}
-        />
-      </div>
-
-      {/* Second KPI Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <StatCard
-          label="Active Batches"
-          value={kpis.totalBatches}
-          icon={<Calendar className="h-4 w-4" />}
-          subtext={kpis.totalBatches === 0 ? "Create your first" : "Running now"}
-        />
-        <StatCard
-          label="New This Month"
-          value={kpis.newThisMonth}
-          icon={<UserPlus className="h-4 w-4" />}
-          change={kpis.newLastMonth > 0 ? ((kpis.newThisMonth - kpis.newLastMonth) / kpis.newLastMonth) * 100 : undefined}
-          changeLabel={`${kpis.newLastMonth} last month`}
-        />
-        <StatCard
-          label="Projected (30d)"
-          value={<>₹{fmtINR(kpis.projectedNext30Days)}</>}
-          icon={<Target className="h-4 w-4" />}
-          subtext="Expiring renewals"
-        />
-        <StatCard
-          label="Last Month"
-          value={<>₹{fmtINR(kpis.lastMonthRevenue)}</>}
-          icon={<Activity className="h-4 w-4" />}
-          subtext="Previous period"
-        />
-      </div>
-
-      {/* Revenue Trend + Status */}
-      <div className="grid lg:grid-cols-3 gap-4">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="font-display text-xl">Revenue Trend</CardTitle>
-                <CardDescription>Last 6 months, by enrolment date</CardDescription>
-              </div>
-              <Badge variant="muted">₹{fmtINR(monthlyRevenue.reduce((a: number, m: any) => a + m.revenue, 0))}</Badge>
-            </div>
-          </CardHeader>
-          <CardContent>
+        <div className="grid gap-4 md:gap-5 lg:grid-cols-3">
+          <ChartCard title="Revenue trend" description="Studio + freelance by month." className="lg:col-span-2">
             <RevenueAreaChart data={monthlyRevenue} />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-display text-xl">Membership Status</CardTitle>
-            <CardDescription>Current breakdown</CardDescription>
-          </CardHeader>
-          <CardContent>
+          </ChartCard>
+          <ChartCard title="Membership status" description="Headcount in each state.">
             <StatusBarChart data={statusDistribution} />
-          </CardContent>
-        </Card>
-      </div>
+          </ChartCard>
+        </div>
+        <div className="grid gap-4 md:gap-5 lg:grid-cols-3">
+          <ChartCard
+            title="Studio vs freelance"
+            description="Stacked fees by month — see the mix."
+            className="lg:col-span-2"
+          >
+            <StudioFreelanceStackedBarChart data={monthlyStudioFreelance ?? []} />
+          </ChartCard>
+          <ChartCard title="Monthly sign-ups" description="New students whose start date falls in each month.">
+            <MonthlyEnrolmentsBarChart
+              data={(monthlyRevenue ?? []).map(({ label, students }: { label: string; students: number }) => ({
+                label,
+                students,
+              }))}
+            />
+          </ChartCard>
+        </div>
+      </section>
 
-      {/* Enrolment + Validity */}
-      <div className="grid lg:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-display text-xl">Enrolment — Last 30 Days</CardTitle>
-            <CardDescription>New students added per day</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <EnrolmentLineChart data={enrolmentTrend} />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-display text-xl">Validity Buckets</CardTitle>
-            <CardDescription>Days remaining across all students</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ValidityBarChart data={validityDistribution} />
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Batch Distribution + Top Batches */}
-      <div className="grid lg:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-display text-xl">Batch Distribution</CardTitle>
-            <CardDescription>Students per batch</CardDescription>
-          </CardHeader>
-          <CardContent>
+      <section className="space-y-5 md:space-y-6">
+        <SectionHeading
+          eyebrow="Classes"
+          title="Batches"
+          description="Student mix and which classes earn the most."
+        />
+        <div className="grid gap-4 md:gap-5 lg:grid-cols-3">
+          <ChartCard title="By batch" description="Share of students per class.">
             <BatchPieChart data={batchDistribution} />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-display text-xl">Top Batches</CardTitle>
-            <CardDescription>Ranked by total revenue</CardDescription>
-          </CardHeader>
-          <CardContent>
+          </ChartCard>
+          <ChartCard title="Top by revenue" description="Ranked by fees collected." className="lg:col-span-2">
             <TopBatchesBarChart data={topBatches} />
-          </CardContent>
-        </Card>
-      </div>
+          </ChartCard>
+        </div>
+      </section>
 
-      {/* Expiring + Recent Activity */}
-      <div className="grid lg:grid-cols-3 gap-4">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="font-display text-xl">Expiring Soon</CardTitle>
-                <CardDescription>Next 10 days plus expired</CardDescription>
-              </div>
-              <Button asChild variant="ghost" size="sm" className="text-muted-foreground">
-                <Link href="/students">View all <ChevronRight className="h-4 w-4" /></Link>
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {expiringList.length === 0 ? (
-              <div className="py-8 text-center text-sm text-muted-foreground">
-                <div className="text-3xl mb-2 opacity-30">✦</div>
-                All memberships are comfortably active.
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                {expiringList.map((s: any) => {
-                  const status = getStatus(s.end_date);
-                  const borderColor =
-                    status.key === "critical" || status.key === "expired" ? "border-l-red-500" :
-                    status.key === "expiring" ? "border-l-amber-500" :
-                    "border-l-emerald-500";
+      <section className="space-y-5 md:space-y-6">
+        <SectionHeading
+          eyebrow="Growth"
+          title="Sign-ups & runway"
+          description="Daily enrolments and validity buckets."
+        />
+        <div className="grid gap-4 md:gap-5 md:grid-cols-2">
+          <ChartCard title="Enrolment" description="New students per day · 30 days.">
+            <EnrolmentLineChart data={enrolmentTrend} />
+          </ChartCard>
+          <ChartCard title="Validity" description="Time left on memberships.">
+            <ValidityBarChart data={validityDistribution} />
+          </ChartCard>
+        </div>
+      </section>
+
+      <section className="space-y-5 md:space-y-6">
+        <SectionHeading eyebrow="Activity" title="Action items" description="Renewals, gigs, and recent payments." />
+        <div className="grid gap-4 md:gap-5 lg:grid-cols-3">
+          <Card plain className="lg:col-span-2 overflow-hidden">
+            <CardHeader className="space-y-2 px-5 pt-5 pb-2 sm:pt-5">
+              <CardTitle className="text-base font-semibold tracking-tight sm:text-lg flex items-center gap-2">
+                <Activity className="h-4 w-4 text-primary shrink-0" />
+                Expiring soon
+              </CardTitle>
+              <CardDescription className="text-sm sm:text-[15px]">Priority renewals.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2.5 px-5 pb-5 sm:pb-5">
+              {expiringList?.length ? (
+                expiringList.slice(0, 8).map((student: any) => {
+                  const status = getStatus(student.end_date);
                   return (
-                    <Link
-                      key={s.id}
-                      href="/students"
-                      className={`flex items-center gap-3 rounded-md border border-l-4 ${borderColor} bg-card px-3 py-2.5 hover:bg-accent/50 transition-colors`}
-                    >
-                      <Avatar className="h-9 w-9 bg-primary/10 text-primary">
-                        {getInitials(s.name)}
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">{s.name}</p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {s.batch_name || "No batch"} · ends {fmtDateShort(s.end_date)}
-                        </p>
+                    <ListRow key={student.id}>
+                      <div className="flex items-center gap-2.5 min-w-0 sm:gap-3">
+                        <Avatar className="h-8 w-8 bg-primary/10 text-primary text-[10px] sm:text-xs shrink-0">
+                          {getInitials(student.name)}
+                        </Avatar>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">{student.name}</p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5 sm:text-xs leading-snug">
+                            {student.batch_name || "Unassigned"} · {fmtDateShort(student.end_date)}
+                          </p>
+                        </div>
                       </div>
-                      {statusBadge(status)}
-                    </Link>
+                      <Badge
+                        variant={status.key === "expired" ? "destructive" : status.key === "critical" ? "warning" : "secondary"}
+                        className="shrink-0 text-[10px] sm:text-xs"
+                      >
+                        {status.label}
+                      </Badge>
+                    </ListRow>
                   );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                })
+              ) : (
+                <p className="text-xs text-muted-foreground py-2 sm:text-sm">Nothing urgent.</p>
+              )}
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-display text-xl">Recent Activity</CardTitle>
-            <CardDescription>Latest enrolments</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {recentActivity.length === 0 ? (
-              <div className="py-8 text-center text-sm text-muted-foreground">No activity yet</div>
-            ) : (
-              <div className="space-y-3">
-                {recentActivity.map((a: any) => (
-                  <div key={a.id} className="flex items-center gap-3">
-                    <Avatar className="h-8 w-8 bg-muted text-foreground text-[10px]">
-                      {getInitials(a.name)}
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{a.name}</p>
-                      <p className="text-[11px] text-muted-foreground truncate">
-                        {a.batch_name || "No batch"} · ₹{fmtINR(a.amount)}
-                      </p>
-                    </div>
-                    <span className="text-[11px] text-muted-foreground whitespace-nowrap">
-                      {fmtDateShort(new Date(a.created_at).toISOString())}
-                    </span>
-                  </div>
-                ))}
+          <Card plain className="overflow-hidden">
+            <CardHeader className="flex flex-row items-start justify-between space-y-0 px-5 pt-5 pb-2 sm:pt-5">
+              <div className="space-y-2 pr-2 min-w-0">
+                <CardTitle className="text-base font-semibold tracking-tight sm:text-lg">Freelance</CardTitle>
+                <CardDescription className="text-sm sm:text-[15px]">Latest gigs.</CardDescription>
               </div>
+              <Button asChild variant="ghost" size="icon" className="shrink-0 h-8 w-8 rounded-full">
+                <Link href="/freelance" aria-label="Open freelance">
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-2.5 px-5 pb-5 sm:pb-5">
+              {recentFreelance?.length ? (
+                recentFreelance.map((gig: any) => (
+                  <ListRow key={gig.id} className="flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-foreground">{gig.client_name}</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5 sm:text-xs">{gig.work_days} days</p>
+                    </div>
+                    <p className="text-sm font-semibold tabular-nums sm:text-right">₹{fmtINR(gig.amount)}</p>
+                  </ListRow>
+                ))
+              ) : (
+                <p className="text-xs text-muted-foreground py-2 sm:text-sm">No gigs yet.</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card plain className="overflow-hidden">
+          <CardHeader className="space-y-2 px-5 pt-5 pb-2 sm:pt-5">
+            <CardTitle className="text-base font-semibold tracking-tight sm:text-lg">Recent students</CardTitle>
+            <CardDescription className="text-sm sm:text-[15px]">Latest fees recorded.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 px-5 pb-5 sm:pb-5">
+            {recentActivity?.length ? (
+              recentActivity.map((activity: any) => (
+                <ListRow key={activity.id} className="flex-col items-stretch gap-1.5">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{activity.name}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5 sm:text-xs">{activity.batch_name || "No batch"}</p>
+                  </div>
+                  <p className="text-sm font-semibold tabular-nums">₹{fmtINR(activity.amount)}</p>
+                </ListRow>
+              ))
+            ) : (
+              <p className="text-xs text-muted-foreground py-2 sm:col-span-2 sm:text-sm lg:col-span-3">No activity yet.</p>
             )}
           </CardContent>
         </Card>
-      </div>
+      </section>
     </div>
   );
 }
 
 function DashboardSkeleton() {
   return (
-    <div className="space-y-6">
-      <Skeleton className="h-24 w-1/2" />
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-28" />)}
+    <div className="space-y-8 md:space-y-11">
+      <div className="space-y-3">
+        <Skeleton className="h-3 w-20" />
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4 md:gap-4">
+          {[...Array(8)].map((_, i) => (
+            <Skeleton key={i} className="h-[108px] rounded-2xl sm:h-[118px]" />
+          ))}
+        </div>
       </div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-28" />)}
-      </div>
-      <div className="grid lg:grid-cols-3 gap-4">
-        <Skeleton className="h-80 lg:col-span-2" />
-        <Skeleton className="h-80" />
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Skeleton className="h-2.5 w-16" />
+          <Skeleton className="h-7 w-56" />
+          <Skeleton className="h-3 w-full max-w-md" />
+        </div>
+        <div className="grid gap-3 lg:grid-cols-3 md:gap-4">
+          <Skeleton className="h-[300px] rounded-2xl lg:col-span-2 sm:h-[320px]" />
+          <Skeleton className="h-[300px] rounded-2xl sm:h-[320px]" />
+        </div>
+        <div className="grid gap-3 lg:grid-cols-3 md:gap-4">
+          <Skeleton className="h-[280px] rounded-2xl lg:col-span-2 sm:h-[300px]" />
+          <Skeleton className="h-[280px] rounded-2xl sm:h-[300px]" />
+        </div>
       </div>
     </div>
   );

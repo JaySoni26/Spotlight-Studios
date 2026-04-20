@@ -1,12 +1,16 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
-import { Inter, Fraunces } from "next/font/google";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AppShell } from "@/components/app-shell";
-import { Toaster } from "sonner";
+import { AppToaster } from "@/components/app-toaster";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
-const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-serif", display: "swap" });
+const plusJakarta = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  display: "swap",
+  weight: ["400", "500", "600", "700"],
+});
 
 export const metadata: Metadata = {
   title: "Spotlight Studios — Dance Management",
@@ -22,10 +26,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} ${fraunces.variable} font-sans antialiased`}>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
+      <body className={`${plusJakarta.variable} font-sans antialiased`}>
+        <ThemeProvider>
           <AppShell>{children}</AppShell>
-          <Toaster position="bottom-center" richColors closeButton />
+          <AppToaster />
         </ThemeProvider>
       </body>
     </html>

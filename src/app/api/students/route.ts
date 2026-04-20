@@ -7,13 +7,13 @@ import { endDateOf } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const d = db();
-  const rows = d.prepare(`
+  const d = await db();
+  const rows = await d.all<any>(`
     SELECT s.*, b.name AS batch_name
     FROM students s
     LEFT JOIN batches b ON b.id = s.batch_id
     ORDER BY s.created_at DESC
-  `).all() as any[];
+  `);
 
   const enriched = rows.map((r) => ({
     ...r,
@@ -27,12 +27,12 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const parsed = StudentInput.parse(body);
     const id = randomUUID();
-    const d = db();
+    const d = await db();
 
-    d.prepare(`
+    await d.run(`
       INSERT INTO students (id, name, phone, amount, start_date, validity_days, batch_id, notes)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
+    `, [
       id,
       parsed.name,
       parsed.phone ?? null,
@@ -41,21 +41,21 @@ export async function POST(req: NextRequest) {
       parsed.validity_days,
       parsed.batch_id || null,
       parsed.notes ?? null,
-    );
+    ]);
 
     // If assigned to a batch, log it as initial assignment
     if (parsed.batch_id) {
-      d.prepare(`
+      await d.run(`
         INSERT INTO batch_history (id, student_id, from_batch_id, to_batch_id, note)
         VALUES (?, ?, NULL, ?, 'Initial enrolment')
-      `).run(randomUUID(), id, parsed.batch_id);
+      `, [randomUUID(), id, parsed.batch_id]);
     }
 
-    const row = d.prepare(`
+    const row = await d.get<any>(`
       SELECT s.*, b.name AS batch_name
       FROM students s LEFT JOIN batches b ON b.id = s.batch_id
       WHERE s.id = ?
-    `).get(id) as any;
+    `, [id]);
 
     return NextResponse.json({ ...row, end_date: endDateOf(row.start_date, row.validity_days) }, { status: 201 });
   } catch (e: any) {
