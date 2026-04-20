@@ -1,0 +1,105 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 40 30% 98%;
+    --foreground: 24 10% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 24 10% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 24 10% 10%;
+
+    --primary: 36 80% 46%;
+    --primary-foreground: 40 30% 98%;
+
+    --secondary: 40 20% 94%;
+    --secondary-foreground: 24 10% 20%;
+
+    --muted: 40 20% 94%;
+    --muted-foreground: 24 6% 45%;
+
+    --accent: 40 20% 92%;
+    --accent-foreground: 24 10% 15%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 30 10% 88%;
+    --input: 30 10% 88%;
+    --ring: 36 80% 46%;
+
+    --chart-1: 36 80% 50%;
+    --chart-2: 168 60% 45%;
+    --chart-3: 220 70% 55%;
+    --chart-4: 280 55% 60%;
+    --chart-5: 10 75% 55%;
+
+    --radius: 0.625rem;
+  }
+
+  .dark {
+    --background: 30 10% 6%;
+    --foreground: 40 20% 96%;
+
+    --card: 30 10% 9%;
+    --card-foreground: 40 20% 96%;
+
+    --popover: 30 10% 9%;
+    --popover-foreground: 40 20% 96%;
+
+    --primary: 36 85% 58%;
+    --primary-foreground: 30 15% 10%;
+
+    --secondary: 30 8% 15%;
+    --secondary-foreground: 40 20% 96%;
+
+    --muted: 30 8% 14%;
+    --muted-foreground: 40 10% 65%;
+
+    --accent: 30 8% 16%;
+    --accent-foreground: 40 20% 96%;
+
+    --destructive: 0 65% 55%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 30 8% 18%;
+    --input: 30 8% 18%;
+    --ring: 36 85% 58%;
+
+    --chart-1: 36 85% 62%;
+    --chart-2: 168 55% 55%;
+    --chart-3: 220 75% 68%;
+    --chart-4: 280 60% 70%;
+    --chart-5: 10 80% 65%;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1, "ss01" 1;
+  }
+  html { -webkit-font-smoothing: antialiased; }
+}
+
+/* Elegant serif headline utility */
+.font-display {
+  font-family: var(--font-serif);
+  font-feature-settings: "ss01", "liga", "calt";
+  letter-spacing: -0.02em;
+}
+
+/* Thin scrollbar */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.5); }
+
+/* Hide scrollbar for tabs on mobile */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

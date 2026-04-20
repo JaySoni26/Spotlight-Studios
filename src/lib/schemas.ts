@@ -1,0 +1,27 @@
+import { z } from "zod";
+
+export const BatchInput = z.object({
+  name: z.string().min(1, "Name is required").max(100),
+  price: z.coerce.number().int().nonnegative(),
+  schedule: z.string().max(200).optional().nullable(),
+  description: z.string().max(500).optional().nullable(),
+});
+
+export const StudentInput = z.object({
+  name: z.string().min(1, "Name is required").max(100),
+  phone: z.string().max(30).optional().nullable(),
+  amount: z.coerce.number().int().nonnegative(),
+  start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date"),
+  validity_days: z.coerce.number().int().positive().max(3650),
+  batch_id: z.string().nullable().optional(),
+  notes: z.string().max(500).optional().nullable(),
+});
+
+export const BatchChangeInput = z.object({
+  student_id: z.string().min(1),
+  to_batch_id: z.string().nullable(),
+  note: z.string().max(200).optional().nullable(),
+});
+
+export type BatchInputT = z.infer<typeof BatchInput>;
+export type StudentInputT = z.infer<typeof StudentInput>;
