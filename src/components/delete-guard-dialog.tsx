@@ -72,7 +72,7 @@ export function DeleteGuardDialog({
         <EntityFormMobileHeader title={title} onBack={() => onOpenChange(false)} />
 
         <div className="flex min-h-0 flex-1 flex-col sm:max-h-[min(90vh,720px)]">
-          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-3 pb-2 pt-1 sm:px-6 sm:pb-4 sm:pt-5">
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 pb-2 pt-1 sm:pb-4 sm:pt-5">
             <DialogHeader className="hidden space-y-2 text-left sm:block sm:pr-0">
               <div className="flex items-start gap-3">
                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-destructive/12 text-destructive">
@@ -124,13 +124,13 @@ export function DeleteGuardDialog({
                   className="text-base sm:text-sm"
                 />
                 <p className="text-[13px] leading-relaxed text-muted-foreground">
-                  This is the code from Settings → Delete protection. Default is often 0000 until you change it.
+                  This is the same studio code as in Settings (default 0000 until you change it).
                 </p>
               </div>
             </div>
           </div>
 
-          <DialogFooter className="mt-auto grid grid-cols-2 gap-3 border-t border-border/50 bg-muted/15 px-3 py-3 max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:flex sm:justify-end sm:gap-2 sm:px-6 sm:py-4">
+          <DialogFooter className="mt-auto grid grid-cols-2 gap-3 border-t border-border/50 bg-muted/15 px-4 py-3 max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:flex sm:justify-end sm:gap-2 sm:py-4">
             <Button
               type="button"
               variant="outline"

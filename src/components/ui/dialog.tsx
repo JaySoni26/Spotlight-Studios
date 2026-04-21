@@ -36,16 +36,16 @@ const DialogContent = React.forwardRef<React.ElementRef<typeof DialogPrimitive.C
             ? [
                 /* Full-viewport step: must pin with inset-0 — without it, fixed + w-full has no box and only the blur shows. */
                 /* No overflow-hidden on mobile — avoids clipping focus rings / shadows; scroll lives in form body. */
-                "max-sm:inset-0 max-sm:flex max-sm:h-dvh max-sm:max-h-dvh max-sm:min-h-0 max-sm:flex-col max-sm:gap-0 max-sm:rounded-none max-sm:bg-background max-sm:px-5 max-sm:pb-0 max-sm:pt-[env(safe-area-inset-top)] max-sm:shadow-none",
+                "max-sm:inset-0 max-sm:flex max-sm:h-dvh max-sm:max-h-dvh max-sm:min-h-0 max-sm:flex-col max-sm:gap-0 max-sm:rounded-none max-sm:bg-background max-sm:px-4 max-sm:pb-0 max-sm:pt-[env(safe-area-inset-top)] max-sm:shadow-none",
                 "max-sm:data-[state=closed]:slide-out-to-bottom max-sm:data-[state=open]:slide-in-from-bottom",
               ]
             : [
                 "grid gap-5 bg-popover text-popover-foreground",
-                "inset-x-0 bottom-0 top-auto max-h-[min(92dvh,100%-env(safe-area-inset-top))] translate-x-0 translate-y-0 rounded-t-2xl rounded-b-none px-5 pt-2 pb-[max(1.25rem,env(safe-area-inset-bottom))] overflow-y-auto overflow-x-hidden shadow-[0_-8px_40px_-12px_rgba(0,0,0,0.18)] dark:shadow-[0_-12px_48px_-8px_rgba(0,0,0,0.55)]",
+                "inset-x-0 bottom-0 top-auto max-h-[min(92dvh,100%-env(safe-area-inset-top))] translate-x-0 translate-y-0 rounded-t-2xl rounded-b-none px-4 pt-2 pb-[max(1.25rem,env(safe-area-inset-bottom))] overflow-y-auto overflow-x-hidden shadow-[0_-8px_40px_-12px_rgba(0,0,0,0.18)] dark:shadow-[0_-12px_48px_-8px_rgba(0,0,0,0.55)]",
                 "data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
               ],
           "sm:grid sm:gap-5 sm:bg-popover sm:text-popover-foreground",
-          "sm:inset-auto sm:left-1/2 sm:top-1/2 sm:bottom-auto sm:max-w-lg sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-2xl sm:border sm:border-border sm:px-6 sm:pt-7 sm:pb-6 sm:shadow-lg",
+          "sm:inset-auto sm:left-1/2 sm:top-1/2 sm:bottom-auto sm:max-w-lg sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-2xl sm:border sm:border-border sm:px-5 sm:pt-6 sm:pb-5 sm:shadow-lg",
           "sm:data-[state=closed]:slide-out-to-left-1/2 sm:data-[state=closed]:slide-out-to-top-[48%] sm:data-[state=open]:slide-in-from-left-1/2 sm:data-[state=open]:slide-in-from-top-[48%]",
           "sm:data-[state=closed]:zoom-out-95 sm:data-[state=open]:zoom-in-95",
           className,

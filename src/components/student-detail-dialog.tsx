@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import { cn, digitsOnlyPhone, fmtDate, formatINMobileDisplay, fmtINR, getInitials, getStatus, isTrialStudent } from "@/lib/utils";
 import { batchAccentColor, trialEnrollmentChipStyles } from "@/lib/chart-palette";
-import { ArrowRightLeft, CalendarCheck, CalendarPlus, Pencil, Trash2, Phone } from "lucide-react";
+import { ArrowRightLeft, CalendarCheck, CalendarPlus, CalendarOff, Pencil, Trash2, Phone } from "lucide-react";
 import { LeaveHistoryList } from "@/components/student-leave-dialog";
 import { StudentDetailSkeleton } from "@/components/detail-sheet-skeleton";
 
@@ -39,6 +39,7 @@ interface StudentDetailDialogProps {
   onExtendTrial?: (s: any) => void;
   onConvertToPaid?: (s: any) => void;
   onBatchChange: (s: any) => void;
+  onLeave: (s: any) => void;
   onDelete: (s: any) => void;
 }
 
@@ -52,6 +53,7 @@ export function StudentDetailDialog({
   onExtendTrial,
   onConvertToPaid,
   onBatchChange,
+  onLeave,
   onDelete,
 }: StudentDetailDialogProps) {
   const [student, setStudent] = React.useState<any>(null);
@@ -87,10 +89,10 @@ export function StudentDetailDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className={cn(
-          "max-h-[min(92dvh,100%-1rem)] gap-0 overflow-y-auto overflow-x-hidden rounded-t-2xl p-0 sm:max-h-[85vh] sm:max-w-lg sm:rounded-2xl sm:border-border/60 sm:shadow-xl",
+          "!p-0 max-h-[min(92dvh,100%-1rem)] gap-0 overflow-y-auto overflow-x-hidden rounded-t-2xl sm:max-h-[85vh] sm:max-w-lg sm:!p-0 sm:rounded-2xl sm:border-border/60 sm:shadow-xl",
         )}
       >
-        <div className="px-5 pb-2 pt-5 sm:px-8 sm:pb-3 sm:pt-7">
+        <div className="px-4 pb-2 pt-5 sm:px-5 sm:pb-3 sm:pt-6">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Student</p>
           <DialogHeader className="mt-2 space-y-0 text-left sm:text-left">
             <div className="flex items-start gap-3 pr-8 sm:pr-10">
@@ -129,7 +131,7 @@ export function StudentDetailDialog({
           </DialogHeader>
         </div>
 
-        <div className="px-5 sm:px-8">
+        <div className="px-4 sm:px-5">
           {showSkeleton ? (
             <StudentDetailSkeleton className="pb-2" />
           ) : (
@@ -187,7 +189,7 @@ export function StudentDetailDialog({
           )}
         </div>
 
-        <div className="mt-4 space-y-3 border-t border-border/50 bg-muted/10 px-5 py-4 sm:px-8">
+        <div className="mt-4 space-y-3 border-t border-border/50 bg-muted/10 px-4 py-4 sm:px-5">
           {showSkeleton ? (
             <>
               <div className="grid grid-cols-2 gap-2">
@@ -239,16 +241,28 @@ export function StudentDetailDialog({
                       ) : null}
                     </div>
                   ) : (
-                    <Button
-                      variant="default"
-                      className="h-11 w-full justify-center gap-2 rounded-full font-semibold"
-                      onClick={() => {
-                        onRenew(student);
-                        onOpenChange(false);
-                      }}
-                    >
-                      <CalendarCheck className="h-4 w-4 shrink-0" /> Renew
-                    </Button>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        variant="default"
+                        className="h-11 w-full justify-center gap-2 rounded-full font-semibold"
+                        onClick={() => {
+                          onRenew(student);
+                          onOpenChange(false);
+                        }}
+                      >
+                        <CalendarCheck className="h-4 w-4 shrink-0" /> Renew
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        className="h-11 w-full justify-center gap-2 rounded-full font-semibold"
+                        onClick={() => {
+                          onLeave(student);
+                          onOpenChange(false);
+                        }}
+                      >
+                        <CalendarOff className="h-4 w-4 shrink-0" /> Leave
+                      </Button>
+                    </div>
                   )}
                 </div>
                 <div className="space-y-2">

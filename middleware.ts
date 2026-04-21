@@ -63,8 +63,10 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Match paths except static assets / image optimizations
+     * Root `/` must be listed explicitly — patterns like `/((?!…).*)` often do not match
+     * an empty path segment, so the dashboard could load without auth.
      */
+    "/",
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

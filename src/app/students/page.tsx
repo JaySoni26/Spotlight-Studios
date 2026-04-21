@@ -576,6 +576,7 @@ function StudentsPageInner() {
         onExtendTrial={(st) => setTrialExtendStudent(st)}
         onConvertToPaid={(st) => setConvertTrialStudent(st)}
         onBatchChange={(st) => openBatchChange(st)}
+        onLeave={(st) => openLeave(st)}
         onDelete={(st) => openDelete(st)}
       />
       <TrialExtendDialog
@@ -710,9 +711,11 @@ function StudentActions({
             <CalendarPlus className="h-4 w-4" /> Extend trial
           </DropdownMenuItem>
         ) : null}
-        <DropdownMenuItem onClick={() => onLeave(student)}>
-          <CalendarOff className="h-4 w-4" /> Record leave
-        </DropdownMenuItem>
+        {!isTrial ? (
+          <DropdownMenuItem onClick={() => onLeave(student)}>
+            <CalendarOff className="h-4 w-4" /> Record leave
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuItem onClick={() => onBatchChange(student)}>
           <ArrowRightLeft className="h-4 w-4" /> Change batch
         </DropdownMenuItem>
