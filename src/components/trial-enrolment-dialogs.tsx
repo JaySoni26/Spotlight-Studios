@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EntityFormMobileHeader } from "@/components/entity-form-mobile-header";
 import { Spinner } from "@/components/ui/spinner";
 import { api } from "@/lib/api";
@@ -136,6 +137,7 @@ export function ConvertToPaidDialog({
   const [amount, setAmount] = React.useState("");
   const [validityDays, setValidityDays] = React.useState("30");
   const [startDate, setStartDate] = React.useState("");
+  const [paymentMethod, setPaymentMethod] = React.useState("cash");
   const [loading, setLoading] = React.useState(false);
 
   React.useEffect(() => {
@@ -143,6 +145,7 @@ export function ConvertToPaidDialog({
     setAmount(batch ? String(batch.price) : "");
     setValidityDays("30");
     setStartDate(format(new Date(), "yyyy-MM-dd"));
+    setPaymentMethod("cash");
   }, [open, student, batch]);
 
   const submit = async (e: React.FormEvent) => {
@@ -158,6 +161,7 @@ export function ConvertToPaidDialog({
         amount: Number(amount),
         validity_days: Number(validityDays) || 30,
         start_date: startDate,
+        payment_method: paymentMethod,
       });
       toast.success(`${student.name} is now on a paid membership`);
       onSaved();
@@ -217,6 +221,21 @@ export function ConvertToPaidDialog({
             <div className="space-y-2">
               <Label className="text-[13px] font-medium">Paid membership starts</Label>
               <Input type="date" className="h-11 rounded-xl" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[13px] font-medium">Payment method</Label>
+              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                <SelectTrigger className="h-11 rounded-xl">
+                  <SelectValue placeholder="Select method" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="upi">UPI</SelectItem>
+                  <SelectItem value="card">Card</SelectItem>
+                  <SelectItem value="bank_transfer">Bank transfer</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter className="border-t border-border/50 bg-muted/10 px-5 py-4 sm:justify-end sm:px-6">

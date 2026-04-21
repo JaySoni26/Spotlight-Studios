@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export const PaymentMethod = z.enum(["cash", "upi", "card", "bank_transfer", "other"]);
+
 export const Weekday = z.enum(["mon", "tue", "wed", "thu", "fri", "sat", "sun"]);
 
 export const BatchScheduleEntry = z.object({
@@ -25,6 +27,7 @@ export const StudentInput = z
     batch_id: z.string().nullable().optional(),
     notes: z.string().max(500).optional().nullable(),
     enrollment_kind: z.enum(["paid", "trial"]).optional().default("paid"),
+    payment_method: PaymentMethod.optional().nullable(),
   })
   .superRefine((val, ctx) => {
     if (val.enrollment_kind === "trial") {
@@ -35,6 +38,14 @@ export const StudentInput = z
           path: ["validity_days"],
         });
       }
+      return;
+    }
+    if (!val.payment_method) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Payment method is required for paid enrolment",
+        path: ["payment_method"],
+      });
     }
   });
 
@@ -42,6 +53,7 @@ export const ConvertTrialInput = z.object({
   amount: z.coerce.number().int().positive(),
   validity_days: z.coerce.number().int().positive().max(3650),
   start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date"),
+  payment_method: PaymentMethod,
 });
 
 export const TrialExtendInput = z.object({

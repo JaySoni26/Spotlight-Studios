@@ -31,7 +31,23 @@ async function readSettings(d: Awaited<ReturnType<typeof db>>) {
     (await d.get<{ value: string }>("SELECT value FROM studio_settings WHERE key = 'ui_theme'"))?.value || "system";
   const ui_theme =
     themeRaw === "light" || themeRaw === "dark" || themeRaw === "system" ? themeRaw : "system";
-  return { delete_admin_code: code, leave_transfer_percent, ui_theme };
+  const recent_transactions = await d.all<{
+    id: string;
+    student_name: string | null;
+    action: string;
+    amount: number;
+    payment_method: string | null;
+    note: string | null;
+    created_at: number;
+  }>(
+    `
+    SELECT id, student_name, action, amount, payment_method, note, created_at
+    FROM transaction_events
+    ORDER BY created_at DESC
+    LIMIT 50
+  `,
+  );
+  return { delete_admin_code: code, leave_transfer_percent, ui_theme, recent_transactions };
 }
 
 export async function GET() {

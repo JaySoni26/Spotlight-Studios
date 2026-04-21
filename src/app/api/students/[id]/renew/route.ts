@@ -3,10 +3,13 @@ import { db } from "@/lib/db";
 import { z } from "zod";
 import { endDateOf, getStudentEndDate } from "@/lib/utils";
 import { addDays, format, parseISO } from "date-fns";
+import { PaymentMethod } from "@/lib/schemas";
+import { logStudentTransaction } from "@/lib/transactions";
 
 const RenewInput = z.object({
   additional_days: z.coerce.number().int().positive().max(3650),
   additional_amount: z.coerce.number().int().nonnegative(),
+  payment_method: PaymentMethod,
   extend_from: z.enum(["today", "current_end"]).default("current_end"),
 });
 
@@ -53,6 +56,17 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     await d.run(`
       UPDATE students SET start_date = ?, validity_days = ?, amount = ? WHERE id = ?
     `, [newStartIso, newValidity, newAmount, params.id]);
+
+    if (parsed.additional_amount > 0) {
+      await logStudentTransaction(d, {
+        studentId: student.id,
+        studentName: student.name,
+        action: "renewal",
+        amount: parsed.additional_amount,
+        paymentMethod: parsed.payment_method,
+        note: `Renewed ${parsed.additional_days} days`,
+      });
+    }
 
     const row = await d.get<any>(`
       SELECT s.*, b.name AS batch_name

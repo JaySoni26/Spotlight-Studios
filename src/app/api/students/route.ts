@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { StudentInput } from "@/lib/schemas";
 import { randomUUID } from "crypto";
 import { endDateOf, getStudentEndDate } from "@/lib/utils";
+import { logStudentTransaction } from "@/lib/transactions";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +49,17 @@ export async function POST(req: NextRequest) {
       kind,
       trialEnd,
     ]);
+
+    if (kind === "paid" && amount > 0) {
+      await logStudentTransaction(d, {
+        studentId: id,
+        studentName: parsed.name,
+        action: "enrolment",
+        amount,
+        paymentMethod: parsed.payment_method ?? null,
+        note: "Initial paid enrolment",
+      });
+    }
 
     // If assigned to a batch, log it as initial assignment
     if (parsed.batch_id) {

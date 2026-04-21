@@ -1,6 +1,7 @@
 "use client";
 import * as React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Home, Users, Calendar, Settings, BriefcaseBusiness, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -30,10 +31,10 @@ const createActions: {
 function Brand({ className }: { className?: string }) {
   return (
     <Link href="/" className={cn("flex items-center gap-2.5 min-w-0 group", className)}>
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground text-xs font-bold tracking-tight">
-        SP
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted/50">
+        <Image src="/logo.svg" alt="Spotlight logo" width={30} height={30} className="h-7 w-7 object-contain" priority />
       </div>
-      <span className="text-[15px] font-semibold tracking-tight truncate">Spotlight</span>
+      <span className="text-[15px] font-semibold tracking-tight truncate">Spotlight studios</span>
     </Link>
   );
 }

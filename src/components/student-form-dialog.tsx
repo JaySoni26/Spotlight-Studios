@@ -36,6 +36,7 @@ export function StudentFormDialog({ open, onOpenChange, batches, student, defaul
     batch_id: "",
     notes: "",
     enrollment_kind: "paid" as "paid" | "trial",
+    payment_method: "cash",
   });
 
   React.useEffect(() => {
@@ -51,6 +52,7 @@ export function StudentFormDialog({ open, onOpenChange, batches, student, defaul
         batch_id: student.batch_id || "",
         notes: student.notes || "",
         enrollment_kind: isTrial ? "trial" : "paid",
+        payment_method: student.payment_method || "cash",
       });
     } else {
       setForm({
@@ -62,6 +64,7 @@ export function StudentFormDialog({ open, onOpenChange, batches, student, defaul
         batch_id: defaultBatchId || "",
         notes: "",
         enrollment_kind: "paid",
+        payment_method: "cash",
       });
     }
   }, [open, student, defaultBatchId]);
@@ -112,6 +115,7 @@ export function StudentFormDialog({ open, onOpenChange, batches, student, defaul
         batch_id: form.batch_id || null,
         notes: form.notes.trim() || null,
         enrollment_kind: form.enrollment_kind,
+        payment_method: form.enrollment_kind === "trial" ? null : form.payment_method,
       };
       if (editing) {
         await api.updateStudent(student.id, payload);
@@ -194,6 +198,25 @@ export function StudentFormDialog({ open, onOpenChange, batches, student, defaul
                       {b.name} · ₹{fmtINR(b.price)}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label variant="form">Payment method</Label>
+              <Select
+                disabled={form.enrollment_kind === "trial"}
+                value={form.enrollment_kind === "trial" ? "cash" : form.payment_method}
+                onValueChange={(v) => setForm((f) => ({ ...f, payment_method: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select method" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="upi">UPI</SelectItem>
+                  <SelectItem value="card">Card</SelectItem>
+                  <SelectItem value="bank_transfer">Bank transfer</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>
             </div>

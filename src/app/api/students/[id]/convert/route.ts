@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { ConvertTrialInput } from "@/lib/schemas";
 import { randomUUID } from "crypto";
 import { getStudentEndDate } from "@/lib/utils";
+import { logStudentTransaction } from "@/lib/transactions";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +40,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     `,
       [randomUUID(), params.id, student.batch_id, student.batch_id, "Converted from trial to paid membership"],
     );
+
+    await logStudentTransaction(d, {
+      studentId: student.id,
+      studentName: student.name,
+      action: "trial_convert",
+      amount: parsed.amount,
+      paymentMethod: parsed.payment_method,
+      note: "Trial converted to paid",
+    });
 
     const row = await d.get<any>(
       `

@@ -29,7 +29,10 @@ export const api = {
   renewStudent: (id: string, data: any) => request(`/api/students/${id}/renew`, { method: "POST", body: JSON.stringify(data) }),
   extendTrial: (id: string, data: { additional_days: number }) =>
     request(`/api/students/${id}/trial/extend`, { method: "POST", body: JSON.stringify(data) }),
-  convertTrialToPaid: (id: string, data: { amount: number; validity_days: number; start_date: string }) =>
+  convertTrialToPaid: (
+    id: string,
+    data: { amount: number; validity_days: number; start_date: string; payment_method: string },
+  ) =>
     request(`/api/students/${id}/convert`, { method: "POST", body: JSON.stringify(data) }),
   recordStudentLeave: (id: string, data: { leave_days: number; transfer_days?: number; notes?: string | null }) =>
     request(`/api/students/${id}/leave`, { method: "POST", body: JSON.stringify(data) }),
@@ -45,7 +48,20 @@ export const api = {
 
   // Settings
   getSettings: () =>
-    request<{ delete_admin_code: string; leave_transfer_percent: number; ui_theme: "light" | "dark" | "system" }>(
+    request<{
+      delete_admin_code: string;
+      leave_transfer_percent: number;
+      ui_theme: "light" | "dark" | "system";
+      recent_transactions: Array<{
+        id: string;
+        student_name: string | null;
+        action: string;
+        amount: number;
+        payment_method: string | null;
+        note: string | null;
+        created_at: number;
+      }>;
+    }>(
       "/api/settings",
     ),
   updateSettings: (data: {
@@ -53,6 +69,16 @@ export const api = {
     leave_transfer_percent?: number;
     ui_theme?: "light" | "dark" | "system";
   }) => request("/api/settings", { method: "PATCH", body: JSON.stringify(data) }),
+  listTransactions: () => request<any[]>("/api/transactions"),
+  listDeletedStudents: () => request<any[]>("/api/deleted-students"),
+  revenueBreakdown: (params: { scope: string; page?: number; page_size?: number }) => {
+    const sp = new URLSearchParams({
+      scope: params.scope,
+      page: String(params.page ?? 1),
+      page_size: String(params.page_size ?? 50),
+    });
+    return request<any>(`/api/revenue-breakdown?${sp.toString()}`);
+  },
 
   // Freelance gigs
   listFreelance: () => request<any[]>("/api/freelance"),

@@ -34,6 +34,11 @@ async function computeAnalytics(): Promise<NextResponse> {
     SELECT *
     FROM freelance_gigs
   `);
+  const transactions = await d.all<any>(`
+    SELECT id, student_name, action, amount, payment_method, note, created_at
+    FROM transaction_events
+    ORDER BY created_at DESC
+  `);
 
   // Enrich students with end_date & status
   const enriched = students.map((s) => {
@@ -53,22 +58,24 @@ async function computeAnalytics(): Promise<NextResponse> {
   const trialsActive = enriched.filter((s) => (s.enrollment_kind || "paid") === "trial" && s.status !== "expired").length;
   const trialsExpired = enriched.filter((s) => (s.enrollment_kind || "paid") === "trial" && s.status === "expired").length;
   const expiringSoon = enriched.filter((s) => s.status === "critical" || s.status === "expiring").length;
-  const totalRevenue = enriched.reduce((a, s) => a + (s.amount || 0), 0);
+  const totalRevenue = transactions.reduce((a, t) => a + (t.amount || 0), 0);
   const freelanceRevenue = freelance.reduce((a, g) => a + (g.amount || 0), 0);
   const combinedRevenue = totalRevenue + freelanceRevenue;
   const avgFee = totalStudents > 0 ? Math.round(totalRevenue / totalStudents) : 0;
 
-  // This month / last month revenue (by start_date)
+  // This month / last month revenue (from transaction ledger)
   const thisMonthStart = startOfMonth(now);
   const thisMonthEnd = endOfMonth(now);
   const lastMonthStart = startOfMonth(subMonths(now, 1));
   const lastMonthEnd = endOfMonth(subMonths(now, 1));
 
   const sumInRange = (from: Date, to: Date) =>
-    enriched.filter((s) => {
-      const d = parseISO(s.start_date);
-      return d >= from && d <= to;
-    }).reduce((a, s) => a + (s.amount || 0), 0);
+    transactions
+      .filter((t) => {
+        const d = new Date(t.created_at);
+        return d >= from && d <= to;
+      })
+      .reduce((a, t) => a + (t.amount || 0), 0);
 
   const thisMonthRevenue = sumInRange(thisMonthStart, thisMonthEnd);
   const lastMonthRevenue = sumInRange(lastMonthStart, lastMonthEnd);
@@ -258,6 +265,28 @@ async function computeAnalytics(): Promise<NextResponse> {
     recentFreelance,
     validityDistribution,
     monthlyStudioFreelance,
+    revenueEntries: {
+      studio: transactions.map((t) => ({
+        id: t.id,
+        source: "studio",
+        label: t.student_name || "Student",
+        action: t.action,
+        amount: t.amount || 0,
+        payment_method: t.payment_method || null,
+        note: t.note || null,
+        created_at: t.created_at,
+      })),
+      freelance: freelance.map((g) => ({
+        id: g.id,
+        source: "freelance",
+        label: g.client_name || "Client",
+        action: "gig_payment",
+        amount: g.amount || 0,
+        payment_method: null,
+        note: g.notes || null,
+        created_at: g.created_at,
+      })),
+    },
     /** Same order as GET /api/batches — drives `batchAccentColor` / trial tint on dashboard. */
     batchesForAccent: batches.map((b) => ({ id: b.id })),
   });

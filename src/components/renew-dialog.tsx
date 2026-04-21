@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EntityFormMobileHeader } from "@/components/entity-form-mobile-header";
 import { api } from "@/lib/api";
 import { endDateOf, fmtDate, fmtINR, daysUntil } from "@/lib/utils";
@@ -25,6 +26,7 @@ export function RenewDialog({ open, onOpenChange, student, batches, onSaved }: R
   const [days, setDays] = React.useState("30");
   const [amount, setAmount] = React.useState("");
   const [extendFrom, setExtendFrom] = React.useState<"current_end" | "today">("current_end");
+  const [paymentMethod, setPaymentMethod] = React.useState("cash");
   const [loading, setLoading] = React.useState(false);
 
   const batch = batches.find((b) => b.id === student?.batch_id);
@@ -39,6 +41,7 @@ export function RenewDialog({ open, onOpenChange, student, batches, onSaved }: R
     setDays("30");
     setAmount(batch ? String(batch.price) : "");
     setExtendFrom(isExpired ? "today" : "current_end");
+    setPaymentMethod("cash");
   }, [open, student, batch, isExpired]);
 
   const projectedEnd = React.useMemo(() => {
@@ -60,6 +63,7 @@ export function RenewDialog({ open, onOpenChange, student, batches, onSaved }: R
       await api.renewStudent(student.id, {
         additional_days: Number(days),
         additional_amount: renewalPayment,
+        payment_method: paymentMethod,
         extend_from: extendFrom,
       });
       toast.success(`${student.name} renewed until ${fmtDate(projectedEnd)}`);
@@ -199,6 +203,21 @@ export function RenewDialog({ open, onOpenChange, student, batches, onSaved }: R
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="0"
                 />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[13px] font-medium">Payment method</Label>
+                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                  <SelectTrigger className="h-11 rounded-xl border-border/70">
+                    <SelectValue placeholder="Select method" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="upi">UPI</SelectItem>
+                    <SelectItem value="card">Card</SelectItem>
+                    <SelectItem value="bank_transfer">Bank transfer</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 

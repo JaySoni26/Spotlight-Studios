@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   RevenueAreaChart,
   BatchPieChart,
@@ -25,6 +27,7 @@ import {
   trialEnrollmentChipStyles,
 } from "@/lib/chart-palette";
 import { Avatar } from "@/components/ui/avatar";
+import { endOfMonth, startOfMonth } from "date-fns";
 
 function SectionHeading({
   eyebrow,
@@ -76,14 +79,27 @@ function KpiCard({
   value,
   subtitle,
   icon,
+  onClick,
 }: {
   title: string;
   value: React.ReactNode;
   subtitle: React.ReactNode;
   icon: React.ReactNode;
+  onClick?: () => void;
 }) {
+  const Wrapper = onClick ? "button" : "div";
   return (
     <Card className="h-full border-border/70">
+      <Wrapper
+        {...(onClick
+          ? {
+              type: "button",
+              onClick,
+              className:
+                "w-full text-left rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
+            }
+          : {})}
+      >
       <CardHeader className="space-y-2.5 pb-2 pt-5 px-5 sm:space-y-3 sm:pt-5 sm:px-5">
         <div className="flex items-start justify-between gap-2">
           <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground leading-snug pr-1 sm:text-[11px]">
@@ -96,6 +112,7 @@ function KpiCard({
       <CardContent className="pt-0 px-5 pb-5 sm:px-5 sm:pb-5">
         <div className="text-xs text-muted-foreground leading-snug sm:text-sm">{subtitle}</div>
       </CardContent>
+      </Wrapper>
     </Card>
   );
 }
@@ -244,6 +261,11 @@ export default function DashboardPage() {
   const [data, setData] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
+  const [moneyDetailOpen, setMoneyDetailOpen] = React.useState(false);
+  const [moneyScope, setMoneyScope] = React.useState<"combined_all" | "combined_month" | "studio_month" | "freelance_month" | null>(null);
+  const [moneyPage, setMoneyPage] = React.useState(1);
+  const [moneyLoading, setMoneyLoading] = React.useState(false);
+  const [moneyBreakdown, setMoneyBreakdown] = React.useState<any>(null);
 
   const load = React.useCallback(() => {
     setLoading(true);
@@ -275,6 +297,30 @@ export default function DashboardPage() {
       paidExpiring: (m.expiring ?? 0) + (m.critical ?? 0),
     };
   }, [data?.statusDistribution]);
+
+  React.useEffect(() => {
+    if (!moneyDetailOpen || !moneyScope) return;
+    setMoneyLoading(true);
+    api
+      .revenueBreakdown({ scope: moneyScope, page: moneyPage, page_size: 50 })
+      .then((res) => setMoneyBreakdown(res))
+      .catch(() => setMoneyBreakdown(null))
+      .finally(() => setMoneyLoading(false));
+  }, [moneyDetailOpen, moneyScope, moneyPage]);
+
+  const moneyTitle =
+    moneyScope === "combined_all"
+      ? "Combined revenue breakdown"
+      : moneyScope === "combined_month"
+        ? "This month revenue breakdown"
+        : moneyScope === "studio_month"
+          ? "Studio (month) breakdown"
+          : "Freelance (month) breakdown";
+  const moneyRows = moneyBreakdown?.rows ?? [];
+  const moneyTotal = moneyBreakdown?.totals?.combined ?? 0;
+  const totalCount = moneyBreakdown?.total_count ?? 0;
+  const pageSize = moneyBreakdown?.page_size ?? 50;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
   if (loading && !data) return <DashboardSkeleton />;
   if (!data && loadError) {
@@ -320,12 +366,22 @@ export default function DashboardPage() {
             value={<>₹{fmtINR(kpis.combinedRevenue)}</>}
             subtitle={`Studio ₹${fmtINR(kpis.totalRevenue)} + freelance ₹${fmtINR(kpis.freelanceRevenue)}`}
             icon={<Wallet className="h-4 w-4" />}
+            onClick={() => {
+              setMoneyScope("combined_all");
+              setMoneyPage(1);
+              setMoneyDetailOpen(true);
+            }}
           />
           <KpiCard
             title="This month"
             value={<>₹{fmtINR(kpis.thisMonthCombined)}</>}
             subtitle={`${kpis.revenueGrowth}% vs last month`}
             icon={<TrendingUp className="h-4 w-4" />}
+            onClick={() => {
+              setMoneyScope("combined_month");
+              setMoneyPage(1);
+              setMoneyDetailOpen(true);
+            }}
           />
           <KpiCard
             title="Students"
@@ -366,12 +422,22 @@ export default function DashboardPage() {
             value={<>₹{fmtINR(kpis.thisMonthRevenue)}</>}
             subtitle={`Prior ₹${fmtINR(kpis.lastMonthRevenue)}`}
             icon={<Calendar className="h-4 w-4" />}
+            onClick={() => {
+              setMoneyScope("studio_month");
+              setMoneyPage(1);
+              setMoneyDetailOpen(true);
+            }}
           />
           <KpiCard
             title="Freelance (month)"
             value={<>₹{fmtINR(kpis.thisMonthFreelance)}</>}
             subtitle={`Prior ₹${fmtINR(kpis.lastMonthFreelance)}`}
             icon={<BriefcaseBusiness className="h-4 w-4" />}
+            onClick={() => {
+              setMoneyScope("freelance_month");
+              setMoneyPage(1);
+              setMoneyDetailOpen(true);
+            }}
           />
           <KpiCard
             title="Avg fee"
@@ -612,9 +678,96 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </section>
+
+      <Dialog open={moneyDetailOpen} onOpenChange={setMoneyDetailOpen}>
+        <DialogContent className="sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>{moneyTitle}</DialogTitle>
+            <DialogDescription>
+              Net = Studio (₹{fmtINR(moneyBreakdown?.totals?.studio || 0)}) + Freelance (₹{fmtINR(moneyBreakdown?.totals?.freelance || 0)})
+              {" "} = <span className="font-semibold text-foreground">₹{fmtINR(moneyTotal)}</span>
+              {" "} · {moneyBreakdown?.period_label || "Period"}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="rounded-xl border border-border/60 bg-muted/25 p-3 text-xs text-muted-foreground">
+            Showing {totalCount === 0 ? 0 : (moneyPage - 1) * pageSize + 1}-{Math.min(moneyPage * pageSize, totalCount)} of {totalCount} records.
+          </div>
+
+          <div className="hidden md:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Source</TableHead>
+                  <TableHead>Action</TableHead>
+                  <TableHead>Payment</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {moneyLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-muted-foreground">Loading…</TableCell>
+                  </TableRow>
+                ) : moneyRows.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-muted-foreground">No records.</TableCell>
+                  </TableRow>
+                ) : moneyRows.map((row: any) => (
+                  <TableRow key={`${row.source}-${row.id}`}>
+                    <TableCell className="font-medium">{row.label}</TableCell>
+                    <TableCell className="capitalize">{row.source}</TableCell>
+                    <TableCell>{String(row.action).replaceAll("_", " ")}</TableCell>
+                    <TableCell>{row.payment_method ? String(row.payment_method).replaceAll("_", " ") : "—"}</TableCell>
+                    <TableCell>{new Date(row.created_at).toLocaleString()}</TableCell>
+                    <TableCell className={`text-right font-semibold tabular-nums ${row.amount < 0 ? "text-destructive" : "text-foreground"}`}>
+                      {row.amount < 0 ? "-" : "+"}₹{fmtINR(Math.abs(row.amount || 0))}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="space-y-2 md:hidden max-h-[55dvh] overflow-auto">
+            {moneyLoading ? (
+              <div className="rounded-xl border border-border/55 bg-muted/20 p-3 text-sm text-muted-foreground">Loading…</div>
+            ) : moneyRows.length === 0 ? (
+              <div className="rounded-xl border border-border/55 bg-muted/20 p-3 text-sm text-muted-foreground">No records.</div>
+            ) : moneyRows.map((row: any) => (
+              <div key={`${row.source}-${row.id}`} className="rounded-xl border border-border/55 bg-muted/20 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold">{row.label}</p>
+                    <p className="text-xs text-muted-foreground capitalize">
+                      {row.source} · {String(row.action).replaceAll("_", " ")}
+                    </p>
+                    <p className="text-xs text-muted-foreground">{new Date(row.created_at).toLocaleString()}</p>
+                  </div>
+                  <p className={`text-sm font-semibold tabular-nums ${row.amount < 0 ? "text-destructive" : "text-foreground"}`}>
+                    {row.amount < 0 ? "-" : "+"}₹{fmtINR(Math.abs(row.amount || 0))}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center justify-end gap-2">
+            <Button variant="outline" size="sm" disabled={moneyPage <= 1 || moneyLoading} onClick={() => setMoneyPage((p) => Math.max(1, p - 1))}>
+              Previous
+            </Button>
+            <span className="text-xs text-muted-foreground">Page {moneyPage} / {totalPages}</span>
+            <Button variant="outline" size="sm" disabled={moneyPage >= totalPages || moneyLoading} onClick={() => setMoneyPage((p) => p + 1)}>
+              Next
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
 
 function DashboardSkeleton() {
   return (

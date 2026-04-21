@@ -11,8 +11,9 @@ import { Spinner } from "@/components/ui/spinner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useTheme } from "@/components/theme-provider";
-import { Shield, Palette, Percent, Save, LogOut } from "lucide-react";
+import { Shield, Palette, Percent, Save, LogOut, ReceiptText, Trash2, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 const shell = "mx-auto w-full max-w-2xl space-y-8 pb-10";
 
@@ -121,11 +122,52 @@ export default function SettingsPage() {
     <div className={shell}>
       <header className="space-y-1">
         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Settings</p>
-        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Preferences</h1>
+        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Account & studio</h1>
         <p className="text-[15px] leading-relaxed text-muted-foreground">
-          Control how Spotlight looks and how sensitive actions behave.
+          Airbnb-style simple controls, audit access, and security defaults.
         </p>
       </header>
+
+      <Card className="plain overflow-hidden rounded-2xl border-border/55 shadow-sm">
+        <CardHeader className="space-y-3 p-5 sm:p-8 sm:pb-5">
+          <CardTitle className="text-lg font-semibold tracking-tight sm:text-xl">Audit & records</CardTitle>
+          <CardDescription className="text-[15px] leading-relaxed">
+            Open full pages for transaction history and deleted students.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3 px-5 pb-6 sm:px-8 sm:pb-8">
+          <Link
+            href="/settings/transactions"
+            className="flex items-center justify-between rounded-2xl border border-border/60 bg-muted/20 px-4 py-3 hover:bg-muted/35"
+          >
+            <span className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted">
+                <ReceiptText className="h-4 w-4" />
+              </span>
+              <span>
+                <p className="text-sm font-semibold">Transaction audit log</p>
+                <p className="text-xs text-muted-foreground">Payments, renewals, refunds, methods</p>
+              </span>
+            </span>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </Link>
+          <Link
+            href="/settings/deleted-students"
+            className="flex items-center justify-between rounded-2xl border border-border/60 bg-muted/20 px-4 py-3 hover:bg-muted/35"
+          >
+            <span className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted">
+                <Trash2 className="h-4 w-4" />
+              </span>
+              <span>
+                <p className="text-sm font-semibold">Deleted students</p>
+                <p className="text-xs text-muted-foreground">Deleted records, refunds, saved snapshots</p>
+              </span>
+            </span>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </Link>
+        </CardContent>
+      </Card>
 
       <Card className="plain overflow-hidden rounded-2xl border-border/55 shadow-sm">
         <CardHeader className="space-y-3 p-5 sm:p-8 sm:pb-5">

@@ -160,6 +160,7 @@ async function migrate(d: DbClient) {
       entity_id TEXT NOT NULL,
       entity_name TEXT NOT NULL,
       refund_amount INTEGER NOT NULL DEFAULT 0,
+      deleted_payload TEXT,
       deleted_at INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000)
     );
 
@@ -179,11 +180,24 @@ async function migrate(d: DbClient) {
       created_at INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000)
     );
 
+    CREATE TABLE IF NOT EXISTS transaction_events (
+      id TEXT PRIMARY KEY,
+      entity_type TEXT NOT NULL DEFAULT 'student',
+      entity_id TEXT,
+      student_name TEXT,
+      action TEXT NOT NULL,
+      amount INTEGER NOT NULL,
+      payment_method TEXT,
+      note TEXT,
+      created_at INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_students_batch ON students(batch_id);
     CREATE INDEX IF NOT EXISTS idx_students_start ON students(start_date);
     CREATE INDEX IF NOT EXISTS idx_batch_history_student ON batch_history(student_id);
     CREATE INDEX IF NOT EXISTS idx_delete_events_entity ON delete_events(entity_type, entity_id);
     CREATE INDEX IF NOT EXISTS idx_freelance_created ON freelance_gigs(created_at);
+    CREATE INDEX IF NOT EXISTS idx_transaction_events_created ON transaction_events(created_at);
   `);
 
   const batchColumns = await d.all<{ name: string }>("PRAGMA table_info(batches)");
@@ -224,6 +238,10 @@ async function migrate(d: DbClient) {
   }
   if (!studentCols.some((c) => c.name === "trial_end_date")) {
     await d.exec(`ALTER TABLE students ADD COLUMN trial_end_date TEXT`);
+  }
+  const deleteEventCols = await d.all<{ name: string }>("PRAGMA table_info(delete_events)");
+  if (!deleteEventCols.some((c) => c.name === "deleted_payload")) {
+    await d.exec("ALTER TABLE delete_events ADD COLUMN deleted_payload TEXT");
   }
 }
 
@@ -274,5 +292,17 @@ export interface FreelanceGigRow {
   amount: number;
   work_days: number;
   notes: string | null;
+  created_at: number;
+}
+
+export interface TransactionEventRow {
+  id: string;
+  entity_type: string;
+  entity_id: string | null;
+  student_name: string | null;
+  action: string;
+  amount: number;
+  payment_method: string | null;
+  note: string | null;
   created_at: number;
 }

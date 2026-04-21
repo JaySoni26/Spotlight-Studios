@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { DeleteWithCodeInput, StudentInput } from "@/lib/schemas";
 import { randomUUID } from "crypto";
 import { endDateOf, getStudentEndDate, verifyDeleteCode } from "@/lib/utils";
+import { logStudentTransaction } from "@/lib/transactions";
 
 export const dynamic = "force-dynamic";
 
@@ -84,14 +85,24 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     return NextResponse.json({ error: "Invalid special code" }, { status: 403 });
   }
 
-  const existing = await d.get<{ id: string; name: string }>("SELECT id, name FROM students WHERE id = ?", [params.id]);
+  const existing = await d.get<any>("SELECT * FROM students WHERE id = ?", [params.id]);
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const result = await d.run("DELETE FROM students WHERE id = ?", [params.id]);
   if (result.changes === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
   await d.run(`
-    INSERT INTO delete_events (id, entity_type, entity_id, entity_name, refund_amount)
-    VALUES (?, 'student', ?, ?, ?)
-  `, [randomUUID(), existing.id, existing.name, parsed.data.refund_amount ?? 0]);
+    INSERT INTO delete_events (id, entity_type, entity_id, entity_name, refund_amount, deleted_payload)
+    VALUES (?, 'student', ?, ?, ?, ?)
+  `, [randomUUID(), existing.id, existing.name, parsed.data.refund_amount ?? 0, JSON.stringify(existing)]);
+  const refundAmount = parsed.data.refund_amount ?? 0;
+  if (refundAmount > 0) {
+    await logStudentTransaction(d, {
+      studentId: existing.id,
+      studentName: existing.name,
+      action: "refund",
+      amount: -refundAmount,
+      note: "Refund on student deletion",
+    });
+  }
   return NextResponse.json({ ok: true });
 }
