@@ -216,6 +216,10 @@ async function migrate(d: DbClient) {
   `);
   await d.run(`
     INSERT OR IGNORE INTO studio_settings (key, value)
+    VALUES ('default_refund_percent', '50')
+  `);
+  await d.run(`
+    INSERT OR IGNORE INTO studio_settings (key, value)
     VALUES ('ui_theme', 'system')
   `);
 

@@ -26,6 +26,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = React.useState(false);
   const [deleteCode, setDeleteCode] = React.useState("");
   const [leavePercent, setLeavePercent] = React.useState("50");
+  const [refundPercent, setRefundPercent] = React.useState("50");
 
   const load = React.useCallback(() => {
     setLoading(true);
@@ -35,6 +36,7 @@ export default function SettingsPage() {
       .then((data) => {
         setDeleteCode(data.delete_admin_code || "0000");
         setLeavePercent(String(data.leave_transfer_percent ?? 50));
+        setRefundPercent(String(data.default_refund_percent ?? 50));
       })
       .catch((e) => {
         const msg = e.message || "Could not load settings";
@@ -58,9 +60,18 @@ export default function SettingsPage() {
       toast.error("Leave transfer must be 0–100%");
       return;
     }
+    const refundPct = parseInt(refundPercent, 10);
+    if (Number.isNaN(refundPct) || refundPct < 0 || refundPct > 100) {
+      toast.error("Default refund must be 0–100%");
+      return;
+    }
     setSaving(true);
     try {
-      await api.updateSettings({ delete_admin_code: deleteCode.trim(), leave_transfer_percent: pct });
+      await api.updateSettings({
+        delete_admin_code: deleteCode.trim(),
+        leave_transfer_percent: pct,
+        default_refund_percent: refundPct,
+      });
       toast.success("Settings saved");
     } catch (e: any) {
       toast.error(e.message);
@@ -270,6 +281,23 @@ export default function SettingsPage() {
             />
             <p className="text-[13px] leading-relaxed text-muted-foreground">
               Example: at 50%, 10 days of leave → 5 extra days on the plan unless you change it when recording leave.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="refund-pct" variant="form">
+              Default refund on delete (% of total paid)
+            </Label>
+            <Input
+              id="refund-pct"
+              type="number"
+              min={0}
+              max={100}
+              value={refundPercent}
+              onChange={(e) => setRefundPercent(e.target.value)}
+              className="max-w-[12rem] text-base sm:text-sm"
+            />
+            <p className="text-[13px] leading-relaxed text-muted-foreground">
+              Prefills the delete dialog refund amount. Example: 50% means a student with ₹10,000 paid starts at ₹5,000 refund.
             </p>
           </div>
           <Separator className="bg-border/60" />

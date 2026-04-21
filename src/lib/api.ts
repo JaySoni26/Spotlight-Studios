@@ -6,6 +6,13 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({ error: "Request failed" }));
+    if (res.status === 401 && typeof window !== "undefined") {
+      const from = `${window.location.pathname}${window.location.search}`;
+      const login = `/login?from=${encodeURIComponent(from || "/")}`;
+      if (!window.location.pathname.startsWith("/login")) {
+        window.location.replace(login);
+      }
+    }
     throw new Error(data.error || `HTTP ${res.status}`);
   }
   return res.json();
@@ -51,6 +58,7 @@ export const api = {
     request<{
       delete_admin_code: string;
       leave_transfer_percent: number;
+      default_refund_percent: number;
       ui_theme: "light" | "dark" | "system";
       recent_transactions: Array<{
         id: string;
@@ -67,6 +75,7 @@ export const api = {
   updateSettings: (data: {
     delete_admin_code?: string;
     leave_transfer_percent?: number;
+    default_refund_percent?: number;
     ui_theme?: "light" | "dark" | "system";
   }) => request("/api/settings", { method: "PATCH", body: JSON.stringify(data) }),
   listTransactions: () => request<any[]>("/api/transactions"),

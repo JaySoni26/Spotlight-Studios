@@ -9,12 +9,14 @@ const UpdateSettingsInput = z
   .object({
     delete_admin_code: z.string().min(4).max(20).optional(),
     leave_transfer_percent: z.coerce.number().int().min(0).max(100).optional(),
+    default_refund_percent: z.coerce.number().int().min(0).max(100).optional(),
     ui_theme: z.enum(["light", "dark", "system"]).optional(),
   })
   .refine(
     (d) =>
       d.delete_admin_code !== undefined ||
       d.leave_transfer_percent !== undefined ||
+      d.default_refund_percent !== undefined ||
       d.ui_theme !== undefined,
     { message: "Provide at least one field" },
   );
@@ -27,6 +29,10 @@ async function readSettings(d: Awaited<ReturnType<typeof db>>) {
     (await d.get<{ value: string }>("SELECT value FROM studio_settings WHERE key = 'leave_transfer_percent'"))
       ?.value || "50";
   const leave_transfer_percent = Math.min(100, Math.max(0, parseInt(pctRaw, 10) || 50));
+  const refundPctRaw =
+    (await d.get<{ value: string }>("SELECT value FROM studio_settings WHERE key = 'default_refund_percent'"))
+      ?.value || "50";
+  const default_refund_percent = Math.min(100, Math.max(0, parseInt(refundPctRaw, 10) || 50));
   const themeRaw =
     (await d.get<{ value: string }>("SELECT value FROM studio_settings WHERE key = 'ui_theme'"))?.value || "system";
   const ui_theme =
@@ -47,7 +53,7 @@ async function readSettings(d: Awaited<ReturnType<typeof db>>) {
     LIMIT 50
   `,
   );
-  return { delete_admin_code: code, leave_transfer_percent, ui_theme, recent_transactions };
+  return { delete_admin_code: code, leave_transfer_percent, default_refund_percent, ui_theme, recent_transactions };
 }
 
 export async function GET() {
@@ -88,6 +94,16 @@ export async function PATCH(req: NextRequest) {
         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
       `,
         [String(parsed.leave_transfer_percent), now],
+      );
+    }
+    if (parsed.default_refund_percent !== undefined) {
+      await d.run(
+        `
+        INSERT INTO studio_settings (key, value, updated_at)
+        VALUES ('default_refund_percent', ?, ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+      `,
+        [String(parsed.default_refund_percent), now],
       );
     }
     if (parsed.ui_theme !== undefined) {

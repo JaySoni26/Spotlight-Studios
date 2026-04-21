@@ -20,7 +20,7 @@ import { DeleteGuardDialog } from "@/components/delete-guard-dialog";
 import { ConvertToPaidDialog, TrialExtendDialog } from "@/components/trial-enrolment-dialogs";
 import { Avatar } from "@/components/ui/avatar";
 import { batchAccentColor } from "@/lib/chart-palette";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export default function StudentProfilePage() {
   const params = useParams<{ id: string }>();
@@ -35,8 +35,10 @@ export default function StudentProfilePage() {
   const [leaveOpen, setLeaveOpen] = React.useState(false);
   const [batchOpen, setBatchOpen] = React.useState(false);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const [moreOpen, setMoreOpen] = React.useState(false);
   const [trialExtendOpen, setTrialExtendOpen] = React.useState(false);
   const [convertOpen, setConvertOpen] = React.useState(false);
+  const [defaultRefundPercent, setDefaultRefundPercent] = React.useState(50);
 
   const load = React.useCallback(() => {
     if (!params?.id) return;
@@ -53,6 +55,12 @@ export default function StudentProfilePage() {
   React.useEffect(() => {
     load();
   }, [load]);
+  React.useEffect(() => {
+    api
+      .getSettings()
+      .then((s) => setDefaultRefundPercent(Math.max(0, Math.min(100, Number(s.default_refund_percent ?? 50)))))
+      .catch(() => {});
+  }, []);
 
   const updateMode = async (id: string, payment_method: "cash" | "online") => {
     setSavingId(id);
@@ -74,6 +82,14 @@ export default function StudentProfilePage() {
   const payments = student.payments || [];
   const deleteRefundInfo = studentRefundBreakdown(student);
   const accent = batchAccentColor(student.batch_id, batches);
+  const monthPaidTotal = payments
+    .filter((p: any) => Number(p.amount || 0) > 0)
+    .filter((p: any) => {
+      const dt = new Date(p.created_at);
+      const now = new Date();
+      return dt.getMonth() === now.getMonth() && dt.getFullYear() === now.getFullYear();
+    })
+    .reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-6 pb-28">
@@ -151,32 +167,6 @@ export default function StudentProfilePage() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-border/60 bg-card px-4 py-3">
-          <div className="mb-2 flex items-center justify-between text-xs">
-            <p className="font-medium text-muted-foreground">Validity progress</p>
-            <p className="tabular-nums text-muted-foreground">
-              {Math.max(0, student.validity_days - Math.max(0, status.days))}/{student.validity_days} days used
-            </p>
-          </div>
-          <div className="h-2 w-full rounded-full bg-muted">
-            <div
-              className="h-2 rounded-full transition-all"
-              style={{
-                width: `${Math.max(
-                  0,
-                  Math.min(
-                    100,
-                    ((student.validity_days - Math.max(0, Math.min(student.validity_days, status.days))) /
-                      Math.max(1, student.validity_days)) *
-                      100,
-                  ),
-                )}%`,
-                backgroundColor: accent,
-              }}
-            />
-          </div>
-        </div>
-
         <Separator />
 
         <section className="rounded-2xl border border-border/60 bg-card">
@@ -219,46 +209,99 @@ export default function StudentProfilePage() {
       </section>
 
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border/60 bg-card px-4 pb-[max(0.8rem,env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-10px_28px_-18px_rgba(0,0,0,0.25)]">
-        <div className="mx-auto grid max-w-4xl grid-cols-2 gap-2">
+        <div className="mx-auto max-w-4xl space-y-2">
+          <div className="px-1 pb-4">
+            <div className="mb-2 flex items-center justify-between text-xs">
+              <p className="font-medium text-muted-foreground">Validity progress</p>
+              <p className="tabular-nums text-muted-foreground">
+                {Math.max(0, student.validity_days - Math.max(0, status.days))}/{student.validity_days} days used
+              </p>
+            </div>
+            <div className="h-2 w-full rounded-full bg-muted">
+              <div
+                className="h-2 rounded-full transition-all"
+                style={{
+                  width: `${Math.max(
+                    0,
+                    Math.min(
+                      100,
+                      ((student.validity_days - Math.max(0, Math.min(student.validity_days, status.days))) /
+                        Math.max(1, student.validity_days)) *
+                        100,
+                    ),
+                  )}%`,
+                  backgroundColor: accent,
+                }}
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
           {!isTrialStudent(student) ? (
             <>
-              <Button className="h-11 rounded-full font-semibold" onClick={() => setRenewOpen(true)}>
+              <Button className="h-11 flex-1 rounded-full font-semibold" onClick={() => setRenewOpen(true)}>
                 <CalendarCheck className="h-4 w-4" /> Renew
               </Button>
-              <Button variant="secondary" className="h-11 rounded-full font-semibold" onClick={() => setLeaveOpen(true)}>
+              <Button variant="secondary" className="h-11 flex-1 rounded-full font-semibold" onClick={() => setLeaveOpen(true)}>
                 <CalendarOff className="h-4 w-4" /> Leave
               </Button>
             </>
           ) : (
             <>
-              <Button variant="secondary" className="h-11 rounded-full font-semibold" onClick={() => setTrialExtendOpen(true)}>
+              <Button variant="secondary" className="h-11 flex-1 rounded-full font-semibold" onClick={() => setTrialExtendOpen(true)}>
                 <CalendarPlus className="h-4 w-4" /> Extend
               </Button>
-              <Button className="h-11 rounded-full font-semibold" onClick={() => setConvertOpen(true)}>
+              <Button className="h-11 flex-1 rounded-full font-semibold" onClick={() => setConvertOpen(true)}>
                 <CalendarCheck className="h-4 w-4" /> Convert
               </Button>
             </>
           )}
-          <Button variant="outline" className="h-11 rounded-full font-semibold" onClick={() => setEditOpen(true)}>
-            <Pencil className="h-4 w-4" /> Edit
+          <Button variant="outline" size="icon" className="h-11 w-11 shrink-0 rounded-full" onClick={() => setMoreOpen(true)}>
+            <MoreHorizontal className="h-5 w-5" />
+            <span className="sr-only">More actions</span>
           </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="h-11 rounded-full font-semibold">
-                <MoreHorizontal className="h-4 w-4" /> More
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52" sideOffset={8}>
-              <DropdownMenuItem onClick={() => setBatchOpen(true)}>
-                <ArrowRightLeft className="mr-2 h-4 w-4" /> Change batch
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button variant="destructive" className="col-span-2 h-11 rounded-full font-semibold" onClick={() => setDeleteOpen(true)}>
-            <Trash2 className="h-4 w-4" /> Delete student
-          </Button>
+          </div>
         </div>
       </div>
+
+      <Dialog open={moreOpen} onOpenChange={setMoreOpen}>
+        <DialogContent className="sm:max-w-sm max-sm:top-auto max-sm:bottom-0 max-sm:left-0 max-sm:right-0 max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-t-3xl max-sm:rounded-b-none">
+          <DialogHeader>
+            <DialogTitle>More actions</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 pb-1">
+            <Button
+              variant="outline"
+              className="h-11 w-full justify-start rounded-full font-semibold"
+              onClick={() => {
+                setMoreOpen(false);
+                setBatchOpen(true);
+              }}
+            >
+              <ArrowRightLeft className="h-4 w-4" /> Change batch
+            </Button>
+            <Button
+              variant="outline"
+              className="h-11 w-full justify-start rounded-full font-semibold"
+              onClick={() => {
+                setMoreOpen(false);
+                setEditOpen(true);
+              }}
+            >
+              <Pencil className="h-4 w-4" /> Edit details
+            </Button>
+            <Button
+              variant="destructive"
+              className="h-11 w-full justify-start rounded-full font-semibold"
+              onClick={() => {
+                setMoreOpen(false);
+                setDeleteOpen(true);
+              }}
+            >
+              <Trash2 className="h-4 w-4" /> Delete student
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <StudentFormDialog open={editOpen} onOpenChange={setEditOpen} batches={batches} student={student} onSaved={load} />
       <RenewDialog open={renewOpen} onOpenChange={setRenewOpen} student={student} batches={batches} onSaved={load} />
@@ -273,7 +316,30 @@ export default function StudentProfilePage() {
         description={`This will permanently remove ${student.name}. Confirm refund and enter code.`}
         confirmLabel="Delete"
         requireRefund
-        defaultRefundAmount={deleteRefundInfo?.suggestedRefund}
+        defaultRefundAmount={Math.round((Number(student.amount || 0) * defaultRefundPercent) / 100)}
+        refundContext={
+          <div className="space-y-4 rounded-xl border border-border/60 bg-muted/30 p-4 dark:bg-muted/15">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Membership snapshot</p>
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px] tabular-nums">
+              <dt className="text-muted-foreground leading-snug">Total paid this month</dt>
+              <dd className="text-right">
+                <span className="block font-semibold text-foreground">₹{fmtINR(monthPaidTotal)}</span>
+                <span className="mt-0.5 block text-[11px] font-normal leading-snug text-muted-foreground">Calendar month to date</span>
+              </dd>
+              <dt className="text-muted-foreground leading-snug">Days consumed</dt>
+              <dd className="text-right font-semibold text-foreground">
+                {deleteRefundInfo.daysUsed} / {deleteRefundInfo.validity_days} days
+              </dd>
+              <dt className="text-muted-foreground leading-snug">Default refund ({defaultRefundPercent}%)</dt>
+              <dd className="text-right font-semibold text-foreground">
+                ₹{fmtINR(Math.round((Number(student.amount || 0) * defaultRefundPercent) / 100))}
+              </dd>
+            </dl>
+            <p className="border-t border-border/50 pt-4 text-[12px] leading-relaxed text-muted-foreground">
+              You can edit the refund amount before confirming. Default refund percentage is managed in Settings.
+            </p>
+          </div>
+        }
         onConfirm={async ({ code, refundAmount }) => {
           await api.deleteStudent(student.id, { code, refund_amount: refundAmount });
           toast.success("Student deleted");

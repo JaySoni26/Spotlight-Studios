@@ -201,22 +201,24 @@ export function StudentFormDialog({ open, onOpenChange, batches, student, defaul
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label variant="form">Payment method</Label>
-              <Select
-                disabled={form.enrollment_kind === "trial"}
-                value={form.enrollment_kind === "trial" ? "cash" : form.payment_method}
-                onValueChange={(v) => setForm((f) => ({ ...f, payment_method: v }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select method" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cash">Cash</SelectItem>
-                  <SelectItem value="online">Online</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {!editing ? (
+              <div className="space-y-2">
+                <Label variant="form">Payment method</Label>
+                <Select
+                  disabled={form.enrollment_kind === "trial"}
+                  value={form.enrollment_kind === "trial" ? "cash" : form.payment_method}
+                  onValueChange={(v) => setForm((f) => ({ ...f, payment_method: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select method" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="online">Online</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
           </div>
 
           <div className="space-y-2">

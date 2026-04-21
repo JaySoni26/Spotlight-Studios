@@ -51,6 +51,8 @@ function StudentsPageInner() {
   const [renewStudent, setRenewStudent] = React.useState<any>(null);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [deleteStudent, setDeleteStudent] = React.useState<any>(null);
+  const [deleteStudentDetails, setDeleteStudentDetails] = React.useState<any | null>(null);
+  const [defaultRefundPercent, setDefaultRefundPercent] = React.useState(50);
   const [leaveOpen, setLeaveOpen] = React.useState(false);
   const [leaveStudent, setLeaveStudent] = React.useState<any | null>(null);
   const [trialExtendStudent, setTrialExtendStudent] = React.useState<any | null>(null);
@@ -73,6 +75,12 @@ function StudentsPageInner() {
   }, []);
 
   React.useEffect(() => { load(); }, [load]);
+  React.useEffect(() => {
+    api
+      .getSettings()
+      .then((s) => setDefaultRefundPercent(Math.max(0, Math.min(100, Number(s.default_refund_percent ?? 50)))))
+      .catch(() => {});
+  }, []);
 
   const spStatus = searchParams.get("status");
   React.useEffect(() => {
@@ -132,10 +140,24 @@ function StudentsPageInner() {
 
   const activeFilters = (batchFilter !== "all" ? 1 : 0) + (statusFilter !== "all" ? 1 : 0);
 
+  const deleteSourceStudent = deleteStudentDetails ?? deleteStudent;
   const deleteRefundInfo = React.useMemo(() => {
-    if (!deleteStudent) return null;
-    return studentRefundBreakdown(deleteStudent);
-  }, [deleteStudent]);
+    if (!deleteSourceStudent) return null;
+    return studentRefundBreakdown(deleteSourceStudent);
+  }, [deleteSourceStudent]);
+  const monthPaidTotal = React.useMemo(() => {
+    if (!deleteStudentDetails?.payments?.length) return 0;
+    const now = new Date();
+    const month = now.getMonth();
+    const year = now.getFullYear();
+    return deleteStudentDetails.payments
+      .filter((p: any) => Number(p.amount || 0) > 0)
+      .filter((p: any) => {
+        const dt = new Date(p.created_at);
+        return dt.getMonth() === month && dt.getFullYear() === year;
+      })
+      .reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+  }, [deleteStudentDetails]);
 
   const openAdd = () => {
     if (batches.length === 0) {
@@ -163,7 +185,9 @@ function StudentsPageInner() {
 
   const openDelete = (s: any) => {
     setDeleteStudent(s);
+    setDeleteStudentDetails(null);
     setDeleteOpen(true);
+    api.getStudent(s.id).then(setDeleteStudentDetails).catch(() => {});
   };
 
   const openLeave = (s: any) => {
@@ -572,40 +596,36 @@ function StudentsPageInner() {
       />
       <DeleteGuardDialog
         open={deleteOpen}
-        onOpenChange={setDeleteOpen}
+        onOpenChange={(v) => {
+          setDeleteOpen(v);
+          if (!v) setDeleteStudentDetails(null);
+        }}
         title="Delete student?"
         description={deleteStudent ? `This will permanently remove ${deleteStudent.name}. Confirm refund amount and enter the special code.` : ""}
         confirmLabel="Delete"
         requireRefund
-        defaultRefundAmount={deleteRefundInfo?.suggestedRefund}
+        defaultRefundAmount={deleteSourceStudent ? Math.round((Number(deleteSourceStudent.amount || 0) * defaultRefundPercent) / 100) : 0}
         refundContext={
           deleteStudent && deleteRefundInfo ? (
             <div className="space-y-4 rounded-xl border border-border/60 bg-muted/30 p-4 dark:bg-muted/15">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Membership snapshot</p>
               <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px] tabular-nums">
-                <dt className="text-muted-foreground leading-snug">This cycle (from start date)</dt>
+                <dt className="text-muted-foreground leading-snug">Total paid this month</dt>
                 <dd className="text-right">
-                  <span className="block font-semibold text-foreground">₹{fmtINR(deleteRefundInfo.amountThisCycle)}</span>
-                  <span className="mt-0.5 block text-[11px] font-normal leading-snug text-muted-foreground">
-                    {deleteRefundInfo.cycleRangeLabel}
-                    {deleteRefundInfo.daysInCycleWindow > 0 ? (
-                      <span className="mt-0.5 block text-[10px] text-muted-foreground/90">
-                        Fee allocated to this {deleteRefundInfo.daysInCycleWindow}-day window (total ÷ validity × days in
-                        window).
-                      </span>
-                    ) : null}
-                  </span>
+                  <span className="block font-semibold text-foreground">₹{fmtINR(monthPaidTotal)}</span>
+                  <span className="mt-0.5 block text-[11px] font-normal leading-snug text-muted-foreground">Calendar month to date</span>
                 </dd>
-                <dt className="text-muted-foreground leading-snug">Days used</dt>
+                <dt className="text-muted-foreground leading-snug">Days consumed</dt>
                 <dd className="text-right font-semibold text-foreground">
                   {deleteRefundInfo.daysUsed} / {deleteRefundInfo.validity_days} days
                 </dd>
-                <dt className="text-muted-foreground leading-snug">Fee consumed</dt>
-                <dd className="text-right font-semibold text-foreground">₹{fmtINR(deleteRefundInfo.consumedValue)}</dd>
+                <dt className="text-muted-foreground leading-snug">Default refund ({defaultRefundPercent}%)</dt>
+                <dd className="text-right font-semibold text-foreground">
+                  ₹{fmtINR(Math.round((Number((deleteSourceStudent ?? deleteStudent).amount || 0) * defaultRefundPercent) / 100))}
+                </dd>
               </dl>
               <p className="border-t border-border/50 pt-4 text-[12px] leading-relaxed text-muted-foreground">
-                Fee is spread over full validity; each cycle is 30 days from their start date. Refund defaults to the unused
-                balance.
+                You can edit the refund amount before confirming. Default refund percentage is managed in Settings.
               </p>
             </div>
           ) : null
