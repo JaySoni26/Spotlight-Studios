@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fmtDate, fmtINR, getInitials, getStatus, isTrialStudent, studentRefundBreakdown } from "@/lib/utils";
-import { ArrowLeft, ArrowRightLeft, Calendar, CalendarCheck, CalendarOff, CalendarPlus, ChevronDown, IndianRupee, Pencil, Timer, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRightLeft, Calendar, CalendarCheck, CalendarOff, CalendarPlus, ChevronDown, IndianRupee, MoreHorizontal, Pencil, Timer, Trash2 } from "lucide-react";
 import { StudentFormDialog } from "@/components/student-form-dialog";
 import { RenewDialog } from "@/components/renew-dialog";
 import { LeaveHistoryList, StudentLeaveDialog } from "@/components/student-leave-dialog";
@@ -20,6 +20,7 @@ import { DeleteGuardDialog } from "@/components/delete-guard-dialog";
 import { ConvertToPaidDialog, TrialExtendDialog } from "@/components/trial-enrolment-dialogs";
 import { Avatar } from "@/components/ui/avatar";
 import { batchAccentColor } from "@/lib/chart-palette";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 export default function StudentProfilePage() {
   const params = useParams<{ id: string }>();
@@ -218,7 +219,7 @@ export default function StudentProfilePage() {
       </section>
 
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border/60 bg-card px-4 pb-[max(0.8rem,env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-10px_28px_-18px_rgba(0,0,0,0.25)]">
-        <div className="mx-auto grid max-w-4xl grid-cols-2 gap-2 rounded-2xl border border-border/60 bg-background/70 p-2">
+        <div className="mx-auto grid max-w-4xl grid-cols-2 gap-2">
           {!isTrialStudent(student) ? (
             <>
               <Button className="h-11 rounded-full font-semibold" onClick={() => setRenewOpen(true)}>
@@ -241,9 +242,18 @@ export default function StudentProfilePage() {
           <Button variant="outline" className="h-11 rounded-full font-semibold" onClick={() => setEditOpen(true)}>
             <Pencil className="h-4 w-4" /> Edit
           </Button>
-          <Button variant="outline" className="h-11 rounded-full font-semibold" onClick={() => setBatchOpen(true)}>
-            <ArrowRightLeft className="h-4 w-4" /> Batch
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="h-11 rounded-full font-semibold">
+                <MoreHorizontal className="h-4 w-4" /> More
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52" sideOffset={8}>
+              <DropdownMenuItem onClick={() => setBatchOpen(true)}>
+                <ArrowRightLeft className="mr-2 h-4 w-4" /> Change batch
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button variant="destructive" className="col-span-2 h-11 rounded-full font-semibold" onClick={() => setDeleteOpen(true)}>
             <Trash2 className="h-4 w-4" /> Delete student
           </Button>

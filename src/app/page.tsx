@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import Link from "next/link";
-import { Users, Wallet, TrendingUp, AlertTriangle, Calendar, BriefcaseBusiness, ArrowRight, Activity, ChevronRight } from "lucide-react";
+import { Users, Wallet, TrendingUp, AlertTriangle, Calendar, BriefcaseBusiness, ArrowRight, Activity, ChevronRight, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -753,7 +753,12 @@ export default function DashboardPage() {
               <TableBody>
                 {moneyLoading ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground">Loading…</TableCell>
+                    <TableCell colSpan={6} className="py-10">
+                      <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Loading records...</span>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ) : moneyRows.length === 0 ? (
                   <TableRow>
@@ -777,7 +782,12 @@ export default function DashboardPage() {
 
           <div className="space-y-2 md:hidden max-h-[55dvh] overflow-auto">
             {moneyLoading ? (
-              <div className="rounded-xl border border-border/55 bg-muted/20 p-3 text-sm text-muted-foreground">Loading…</div>
+              <div className="rounded-xl border border-border/55 bg-muted/20 p-3 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Loading records...</span>
+                </div>
+              </div>
             ) : moneyRows.length === 0 ? (
               <div className="rounded-xl border border-border/55 bg-muted/20 p-3 text-sm text-muted-foreground">No records.</div>
             ) : moneyRows.map((row: any) => (

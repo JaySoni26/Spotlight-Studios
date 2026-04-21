@@ -35,7 +35,7 @@ async function computeAnalytics(): Promise<NextResponse> {
     FROM freelance_gigs
   `);
   const transactions = await d.all<any>(`
-    SELECT id, student_name, action, amount, payment_method, note, created_at
+    SELECT id, entity_type, student_name, action, amount, payment_method, note, created_at
     FROM transaction_events
     ORDER BY created_at DESC
   `);
@@ -58,8 +58,12 @@ async function computeAnalytics(): Promise<NextResponse> {
   const trialsActive = enriched.filter((s) => (s.enrollment_kind || "paid") === "trial" && s.status !== "expired").length;
   const trialsExpired = enriched.filter((s) => (s.enrollment_kind || "paid") === "trial" && s.status === "expired").length;
   const expiringSoon = enriched.filter((s) => s.status === "critical" || s.status === "expiring").length;
-  const totalRevenue = transactions.reduce((a, t) => a + (t.amount || 0), 0);
-  const freelanceRevenue = freelance.reduce((a, g) => a + (g.amount || 0), 0);
+  const totalRevenue = transactions
+    .filter((t) => (t.entity_type || "student") !== "freelance")
+    .reduce((a, t) => a + (t.amount || 0), 0);
+  const freelanceRevenue = transactions
+    .filter((t) => (t.entity_type || "student") === "freelance")
+    .reduce((a, t) => a + (t.amount || 0), 0);
   const combinedRevenue = totalRevenue + freelanceRevenue;
   const avgFee = totalStudents > 0 ? Math.round(totalRevenue / totalStudents) : 0;
   const paidTransactions = transactions.filter((t) => (t.amount || 0) > 0);
@@ -82,22 +86,22 @@ async function computeAnalytics(): Promise<NextResponse> {
     transactions
       .filter((t) => {
         const d = new Date(t.created_at);
-        return d >= from && d <= to;
+        return (t.entity_type || "student") !== "freelance" && d >= from && d <= to;
       })
       .reduce((a, t) => a + (t.amount || 0), 0);
 
   const thisMonthRevenue = sumInRange(thisMonthStart, thisMonthEnd);
   const lastMonthRevenue = sumInRange(lastMonthStart, lastMonthEnd);
-  const thisMonthFreelance = freelance
+  const thisMonthFreelance = transactions
     .filter((g) => {
       const d = new Date(g.created_at);
-      return d >= thisMonthStart && d <= thisMonthEnd;
+      return (g.entity_type || "student") === "freelance" && d >= thisMonthStart && d <= thisMonthEnd;
     })
     .reduce((a, g) => a + (g.amount || 0), 0);
-  const lastMonthFreelance = freelance
+  const lastMonthFreelance = transactions
     .filter((g) => {
       const d = new Date(g.created_at);
-      return d >= lastMonthStart && d <= lastMonthEnd;
+      return (g.entity_type || "student") === "freelance" && d >= lastMonthStart && d <= lastMonthEnd;
     })
     .reduce((a, g) => a + (g.amount || 0), 0);
   const thisMonthCombined = thisMonthRevenue + thisMonthFreelance;
@@ -122,10 +126,10 @@ async function computeAnalytics(): Promise<NextResponse> {
     const from = startOfMonth(monthDate);
     const to = endOfMonth(monthDate);
     const studioOnly = sumInRange(from, to);
-    const freelanceOnly = freelance
+    const freelanceOnly = transactions
       .filter((g) => {
         const d = new Date(g.created_at);
-        return d >= from && d <= to;
+        return (g.entity_type || "student") === "freelance" && d >= from && d <= to;
       })
       .reduce((a, g) => a + (g.amount || 0), 0);
     monthlyRevenue.push({

@@ -13,41 +13,36 @@ function asScope(v: string | null): Scope {
 }
 
 function buildWhere(scope: Scope) {
-  if (scope === "combined_all") return { txWhere: "", gigWhere: "", args: [] as any[] };
+  if (scope === "combined_all") return { txWhere: "", args: [] as any[] };
   const now = new Date();
   const from = startOfMonth(now).getTime();
   const to = endOfMonth(now).getTime();
   if (scope === "combined_month") {
     return {
       txWhere: "WHERE created_at BETWEEN ? AND ?",
-      gigWhere: "WHERE created_at BETWEEN ? AND ?",
       args: [from, to],
     };
   }
   if (scope === "studio_month") {
     return {
-      txWhere: "WHERE created_at BETWEEN ? AND ?",
-      gigWhere: "WHERE 1=0",
+      txWhere: "WHERE created_at BETWEEN ? AND ? AND COALESCE(entity_type, 'student') != 'freelance'",
       args: [from, to],
     };
   }
   if (scope === "cash") {
     return {
       txWhere: "WHERE amount > 0 AND COALESCE(payment_method, 'cash') = 'cash'",
-      gigWhere: "WHERE 1=0",
       args: [] as any[],
     };
   }
   if (scope === "online") {
     return {
       txWhere: "WHERE amount > 0 AND COALESCE(payment_method, 'cash') = 'online'",
-      gigWhere: "WHERE 1=0",
       args: [] as any[],
     };
   }
   return {
-    txWhere: "WHERE 1=0",
-    gigWhere: "WHERE created_at BETWEEN ? AND ?",
+    txWhere: "WHERE created_at BETWEEN ? AND ? AND COALESCE(entity_type, 'student') = 'freelance'",
     args: [from, to],
   };
 }
@@ -60,58 +55,43 @@ export async function GET(req: NextRequest) {
     const page = Math.max(1, Number(sp.get("page") || 1));
     const pageSize = Math.min(100, Math.max(10, Number(sp.get("page_size") || 50)));
     const offset = (page - 1) * pageSize;
-    const { txWhere, gigWhere, args } = buildWhere(scope);
+    const { txWhere, args } = buildWhere(scope);
 
     const rows = await d.all<any>(
       `
-      SELECT * FROM (
-        SELECT
-          id,
-          'studio' AS source,
-          COALESCE(student_name, 'Student') AS label,
-          action,
-          amount,
-          payment_method,
-          note,
-          created_at
-        FROM transaction_events
-        ${txWhere}
-        UNION ALL
-        SELECT
-          id,
-          'freelance' AS source,
-          COALESCE(client_name, 'Client') AS label,
-          'gig_payment' AS action,
-          amount,
-          NULL AS payment_method,
-          notes AS note,
-          created_at
-        FROM freelance_gigs
-        ${gigWhere}
-      )
+      SELECT
+        id,
+        CASE WHEN COALESCE(entity_type, 'student') = 'freelance' THEN 'freelance' ELSE 'studio' END AS source,
+        COALESCE(student_name, CASE WHEN COALESCE(entity_type, 'student') = 'freelance' THEN 'Client' ELSE 'Student' END) AS label,
+        action,
+        amount,
+        payment_method,
+        note,
+        created_at
+      FROM transaction_events
+      ${txWhere}
       ORDER BY created_at DESC
       LIMIT ? OFFSET ?
     `,
-      [...args, ...args, pageSize, offset],
+      [...args, pageSize, offset],
     );
 
     const countRow = await d.get<{ c: number }>(
       `
-      SELECT COUNT(*) AS c FROM (
-        SELECT id FROM transaction_events ${txWhere}
-        UNION ALL
-        SELECT id FROM freelance_gigs ${gigWhere}
-      )
+      SELECT COUNT(*) AS c FROM transaction_events ${txWhere}
     `,
-      [...args, ...args],
-    );
-
-    const studioRow = await d.get<{ total: number }>(
-      `SELECT COALESCE(SUM(amount), 0) AS total FROM transaction_events ${txWhere}`,
       [...args],
     );
-    const freelanceRow = await d.get<{ total: number }>(
-      `SELECT COALESCE(SUM(amount), 0) AS total FROM freelance_gigs ${gigWhere}`,
+
+    const totalsRow = await d.get<{ studio: number; freelance: number; combined: number }>(
+      `
+      SELECT
+        COALESCE(SUM(CASE WHEN COALESCE(entity_type, 'student') = 'freelance' THEN 0 ELSE amount END), 0) AS studio,
+        COALESCE(SUM(CASE WHEN COALESCE(entity_type, 'student') = 'freelance' THEN amount ELSE 0 END), 0) AS freelance,
+        COALESCE(SUM(amount), 0) AS combined
+      FROM transaction_events
+      ${txWhere}
+    `,
       [...args],
     );
 
@@ -125,9 +105,9 @@ export async function GET(req: NextRequest) {
       page_size: pageSize,
       total_count: countRow?.c || 0,
       totals: {
-        studio: studioRow?.total || 0,
-        freelance: freelanceRow?.total || 0,
-        combined: (studioRow?.total || 0) + (freelanceRow?.total || 0),
+        studio: totalsRow?.studio || 0,
+        freelance: totalsRow?.freelance || 0,
+        combined: totalsRow?.combined || 0,
       },
       rows,
     });
