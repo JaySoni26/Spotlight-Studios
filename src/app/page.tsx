@@ -195,7 +195,7 @@ function ExpiringSoonAttention({ list, batches }: { list: any[]; batches: { id: 
           return (
             <Link
               key={student.id}
-              href={`/students?student=${encodeURIComponent(student.id)}`}
+              href={`/students/${encodeURIComponent(student.id)}`}
               className={cn(
                 "group flex items-center gap-2.5 rounded-xl border-y border-r border-border/60 bg-card py-2 pl-2 pr-2.5 text-left shadow-sm ring-1 ring-black/[0.04] transition-all duration-200 ease-out sm:gap-3 sm:py-2.5 sm:pl-2.5 sm:pr-3",
                 "hover:-translate-y-px hover:border-border hover:shadow-md hover:ring-black/[0.06]",
@@ -618,7 +618,7 @@ export default function DashboardPage() {
                     return (
                       <Link
                         key={student.id}
-                        href={`/students?student=${encodeURIComponent(student.id)}`}
+                        href={`/students/${encodeURIComponent(student.id)}`}
                         className="block rounded-xl outline-none ring-offset-background transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2"
                       >
                         <ListRow

@@ -175,6 +175,7 @@ async function migrate(d: DbClient) {
       client_name TEXT NOT NULL,
       phone TEXT,
       amount INTEGER NOT NULL DEFAULT 0,
+      payment_method TEXT,
       work_days INTEGER NOT NULL DEFAULT 1,
       notes TEXT,
       created_at INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000)
@@ -257,6 +258,64 @@ async function migrate(d: DbClient) {
     UPDATE transaction_events
     SET payment_method = 'online'
     WHERE LOWER(COALESCE(payment_method, '')) NOT IN ('cash', 'online') AND amount > 0;
+  `);
+  const freelanceCols = await d.all<{ name: string }>("PRAGMA table_info(freelance_gigs)");
+  if (!freelanceCols.some((c) => c.name === "payment_method")) {
+    await d.exec("ALTER TABLE freelance_gigs ADD COLUMN payment_method TEXT");
+  }
+  await d.exec(`
+    UPDATE freelance_gigs
+    SET payment_method = 'cash'
+    WHERE payment_method IS NULL OR TRIM(payment_method) = '';
+  `);
+  await d.exec(`
+    UPDATE freelance_gigs
+    SET payment_method = 'online'
+    WHERE LOWER(COALESCE(payment_method, '')) IN ('upi', 'card', 'bank_transfer', 'other');
+  `);
+  await d.exec(`
+    UPDATE freelance_gigs
+    SET payment_method = 'online'
+    WHERE LOWER(COALESCE(payment_method, '')) NOT IN ('cash', 'online');
+  `);
+  await d.exec(`
+    INSERT INTO transaction_events (id, entity_type, entity_id, student_name, action, amount, payment_method, note, created_at)
+    SELECT
+      lower(hex(randomblob(16))),
+      'student',
+      s.id,
+      s.name,
+      CASE WHEN COALESCE(s.enrollment_kind, 'paid') = 'trial' THEN 'trial_convert' ELSE 'enrolment' END,
+      s.amount,
+      'cash',
+      'Legacy import',
+      s.created_at
+    FROM students s
+    WHERE s.amount > 0
+      AND COALESCE(s.enrollment_kind, 'paid') = 'paid'
+      AND NOT EXISTS (
+        SELECT 1 FROM transaction_events t
+        WHERE t.entity_type = 'student' AND t.entity_id = s.id AND t.amount > 0
+      );
+  `);
+  await d.exec(`
+    INSERT INTO transaction_events (id, entity_type, entity_id, student_name, action, amount, payment_method, note, created_at)
+    SELECT
+      lower(hex(randomblob(16))),
+      'freelance',
+      f.id,
+      f.client_name,
+      'gig_payment',
+      f.amount,
+      COALESCE(f.payment_method, 'cash'),
+      f.notes,
+      f.created_at
+    FROM freelance_gigs f
+    WHERE f.amount > 0
+      AND NOT EXISTS (
+        SELECT 1 FROM transaction_events t
+        WHERE t.entity_type = 'freelance' AND t.entity_id = f.id
+      );
   `);
 }
 

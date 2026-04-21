@@ -63,6 +63,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [createOpen, setCreateOpen] = React.useState(false);
 
   const isLogin = pathname === "/login";
+  const isStudentProfile = /^\/students\/[^/]+$/.test(pathname || "");
 
   React.useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
@@ -73,6 +74,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   if (isLogin) {
     return <div className="min-h-screen bg-background">{children}</div>;
+  }
+
+  if (isStudentProfile) {
+    return (
+      <div className="min-h-screen bg-background">
+        <main className="mx-auto max-w-[900px] px-4 sm:px-6 pb-[calc(7.5rem+env(safe-area-inset-bottom))] pt-0">
+          <div className="animate-fade-in">{children}</div>
+        </main>
+      </div>
+    );
   }
 
   return (

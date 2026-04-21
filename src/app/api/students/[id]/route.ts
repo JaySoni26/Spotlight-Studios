@@ -20,7 +20,14 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
      FROM student_leaves WHERE student_id = ? ORDER BY created_at DESC LIMIT 20`,
     [params.id],
   );
-  return NextResponse.json({ ...row, end_date: getStudentEndDate(row), leaves });
+  const payments = await d.all<any>(
+    `SELECT id, action, amount, payment_method, note, created_at
+     FROM transaction_events
+     WHERE entity_type = 'student' AND entity_id = ?
+     ORDER BY created_at DESC`,
+    [params.id],
+  );
+  return NextResponse.json({ ...row, end_date: getStudentEndDate(row), leaves, payments });
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
@@ -30,7 +37,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const d = await db();
 
     // Get existing to detect batch change
-    const existing = await d.get<{ batch_id: string | null }>("SELECT batch_id FROM students WHERE id = ?", [params.id]);
+    const existing = await d.get<any>("SELECT id, name, batch_id, created_at, amount, enrollment_kind FROM students WHERE id = ?", [params.id]);
     if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     const kind = parsed.enrollment_kind === "trial" ? "trial" : "paid";
@@ -60,6 +67,32 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         INSERT INTO batch_history (id, student_id, from_batch_id, to_batch_id, note)
         VALUES (?, ?, ?, ?, 'Updated via edit')
       `, [randomUUID(), params.id, existing.batch_id, newBatchId]);
+    }
+
+    if (kind === "paid" && parsed.payment_method) {
+      const updatedAny = await d.run(
+        `
+        UPDATE transaction_events
+        SET payment_method = ?
+        WHERE id = (
+          SELECT id FROM transaction_events
+          WHERE entity_type = 'student' AND entity_id = ? AND amount > 0
+          ORDER BY created_at DESC
+          LIMIT 1
+        )
+      `,
+        [parsed.payment_method, params.id],
+      );
+      if (!updatedAny.changes && amount > 0) {
+        await logStudentTransaction(d, {
+          studentId: existing.id,
+          studentName: parsed.name || existing.name,
+          action: "enrolment",
+          amount,
+          paymentMethod: parsed.payment_method,
+          note: "Imported from student edit",
+        });
+      }
     }
 
     const row = await d.get<any>(`

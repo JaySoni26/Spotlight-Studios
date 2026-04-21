@@ -97,6 +97,9 @@ export function FreelanceDetailDialog({ open, onOpenChange, gigId, accentColor, 
                 <Badge className="border-transparent bg-primary px-3 py-1 text-sm font-semibold text-primary-foreground">
                   ₹{fmtINR(gig.amount)}
                 </Badge>
+                <Badge variant="outline" className="font-medium capitalize">
+                  {gig.payment_method || "cash"}
+                </Badge>
                 <Badge variant="outline" className="font-medium">
                   {gig.work_days} work days
                 </Badge>

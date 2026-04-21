@@ -9,7 +9,7 @@ export async function GET() {
     const d = await db();
     const rows = await d.all<any>(
       `
-      SELECT id, student_name, action, amount, payment_method, note, created_at
+      SELECT id, entity_type, entity_id, student_name, action, amount, payment_method, note, created_at
       FROM transaction_events
       ORDER BY created_at DESC
       LIMIT 500

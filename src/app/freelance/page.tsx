@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { EntityFormMobileHeader } from "@/components/entity-form-mobile-header";
 import { Spinner } from "@/components/ui/spinner";
@@ -17,7 +18,7 @@ import { api } from "@/lib/api";
 import { digitsOnlyPhone, fmtINR, formatINMobileDisplay, IN_MOBILE_DIGITS } from "@/lib/utils";
 import { seriesColor } from "@/lib/chart-palette";
 
-const initialForm = { client_name: "", phone: "", amount: "", work_days: "", notes: "" };
+const initialForm = { client_name: "", phone: "", amount: "", payment_method: "cash", work_days: "", notes: "" };
 
 function FreelancePageInner() {
   const searchParams = useSearchParams();
@@ -72,6 +73,7 @@ function FreelancePageInner() {
       client_name: gig.client_name || "",
       phone: gig.phone ? digitsOnlyPhone(String(gig.phone)) : "",
       amount: String(gig.amount ?? ""),
+      payment_method: gig.payment_method || "cash",
       work_days: String(gig.work_days ?? ""),
       notes: gig.notes || "",
     });
@@ -97,6 +99,7 @@ function FreelancePageInner() {
         client_name: form.client_name.trim(),
         phone: phoneDigits || null,
         amount: Number(form.amount) || 0,
+        payment_method: form.payment_method || "cash",
         work_days: Number(form.work_days) || 1,
         notes: form.notes.trim() || null,
       };
@@ -376,6 +379,18 @@ function FreelancePageInner() {
                   value={form.amount}
                   onChange={(e) => setForm((prev) => ({ ...prev, amount: e.target.value }))}
                 />
+              </div>
+              <div className="space-y-2">
+                <Label variant="form">Payment mode</Label>
+                <Select value={form.payment_method} onValueChange={(v) => setForm((prev) => ({ ...prev, payment_method: v }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select mode" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="online">Online</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div className="space-y-2">

@@ -70,6 +70,8 @@ export const api = {
     ui_theme?: "light" | "dark" | "system";
   }) => request("/api/settings", { method: "PATCH", body: JSON.stringify(data) }),
   listTransactions: () => request<any[]>("/api/transactions"),
+  updateTransaction: (id: string, data: { payment_method: "cash" | "online" }) =>
+    request(`/api/transactions/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   listDeletedStudents: () => request<any[]>("/api/deleted-students"),
   revenueBreakdown: (params: { scope: string; page?: number; page_size?: number }) => {
     const sp = new URLSearchParams({

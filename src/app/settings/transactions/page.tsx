@@ -8,10 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, ReceiptText } from "lucide-react";
 import { fmtINR } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function TransactionsAuditPage() {
   const [loading, setLoading] = React.useState(true);
   const [items, setItems] = React.useState<any[]>([]);
+  const [savingId, setSavingId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     api
@@ -20,6 +22,19 @@ export default function TransactionsAuditPage() {
       .catch((e) => toast.error(e.message || "Could not load transactions"))
       .finally(() => setLoading(false));
   }, []);
+
+  const updateMode = async (id: string, payment_method: "cash" | "online") => {
+    setSavingId(id);
+    try {
+      const updated: any = await api.updateTransaction(id, { payment_method });
+      setItems((prev) => prev.map((it) => (it.id === id ? { ...it, payment_method: updated.payment_method } : it)));
+      toast.success("Payment mode updated");
+    } catch (e: any) {
+      toast.error(e.message || "Could not update payment mode");
+    } finally {
+      setSavingId(null);
+    }
+  };
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-6 pb-10">
@@ -61,9 +76,26 @@ export default function TransactionsAuditPage() {
                     <p className="font-medium">{txn.student_name || "Student"}</p>
                     <p className="text-xs text-muted-foreground">
                       {String(txn.action).replaceAll("_", " ")}
-                      {txn.payment_method ? ` · ${String(txn.payment_method).replaceAll("_", " ")}` : ""}
+                      {` · ${(txn.payment_method || "cash").replaceAll("_", " ")}`}
                     </p>
                     {txn.note ? <p className="text-xs text-muted-foreground">{txn.note}</p> : null}
+                    {txn.amount > 0 ? (
+                      <div className="mt-2 max-w-[9rem]">
+                        <Select
+                          value={txn.payment_method || "cash"}
+                          onValueChange={(v: "cash" | "online") => updateMode(txn.id, v)}
+                          disabled={savingId === txn.id}
+                        >
+                          <SelectTrigger className="h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="cash">Cash</SelectItem>
+                            <SelectItem value="online">Online</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : null}
                   </div>
                   <div className="shrink-0 text-right">
                     <p className={`font-semibold tabular-nums ${txn.amount < 0 ? "text-destructive" : "text-primary"}`}>

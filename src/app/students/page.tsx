@@ -17,7 +17,6 @@ import { StudentFormDialog } from "@/components/student-form-dialog";
 import { BatchChangeDialog } from "@/components/batch-change-dialog";
 import { RenewDialog } from "@/components/renew-dialog";
 import { DeleteGuardDialog } from "@/components/delete-guard-dialog";
-import { StudentDetailDialog } from "@/components/student-detail-dialog";
 import { StudentLeaveDialog } from "@/components/student-leave-dialog";
 import { ConvertToPaidDialog, TrialExtendDialog } from "@/components/trial-enrolment-dialogs";
 import { api } from "@/lib/api";
@@ -52,7 +51,6 @@ function StudentsPageInner() {
   const [renewStudent, setRenewStudent] = React.useState<any>(null);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [deleteStudent, setDeleteStudent] = React.useState<any>(null);
-  const [studentDetailId, setStudentDetailId] = React.useState<string | null>(null);
   const [leaveOpen, setLeaveOpen] = React.useState(false);
   const [leaveStudent, setLeaveStudent] = React.useState<any | null>(null);
   const [trialExtendStudent, setTrialExtendStudent] = React.useState<any | null>(null);
@@ -75,11 +73,6 @@ function StudentsPageInner() {
   }, []);
 
   React.useEffect(() => { load(); }, [load]);
-
-  const spStudent = searchParams.get("student");
-  React.useEffect(() => {
-    if (spStudent) setStudentDetailId(spStudent);
-  }, [spStudent]);
 
   const spStatus = searchParams.get("status");
   React.useEffect(() => {
@@ -182,7 +175,6 @@ function StudentsPageInner() {
     if (!deleteStudent) return;
     try {
       await api.deleteStudent(deleteStudent.id, { code, refund_amount: refundAmount });
-      setStudentDetailId(null);
       toast.success(`${deleteStudent.name} removed`);
       load();
     } catch (e: any) {
@@ -354,7 +346,7 @@ function StudentsPageInner() {
                   <TableRow
                     key={s.id}
                     className="cursor-pointer hover:bg-muted/40"
-                    onClick={() => setStudentDetailId(s.id)}
+                    onClick={() => router.push(`/students/${s.id}`)}
                   >
                     <TableCell>
                       <div className="flex items-center gap-3">
@@ -431,11 +423,11 @@ function StudentsPageInner() {
                   role="button"
                   tabIndex={0}
                   className="cursor-pointer overflow-hidden rounded-xl border border-border/45 bg-muted/10 text-card-foreground shadow-none ring-1 ring-border/25 transition-all duration-200 hover:bg-muted/20 hover:ring-primary/20 hover:shadow-sm active:scale-[0.99] dark:bg-card/35 dark:ring-border/20"
-                  onClick={() => setStudentDetailId(s.id)}
+                  onClick={() => router.push(`/students/${s.id}`)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
-                      setStudentDetailId(s.id);
+                      router.push(`/students/${s.id}`);
                     }
                   }}
                 >
@@ -555,29 +547,6 @@ function StudentsPageInner() {
         student={renewStudent}
         batches={batches}
         onSaved={load}
-      />
-      <StudentDetailDialog
-        open={!!studentDetailId}
-        onOpenChange={(v) => {
-          if (!v) {
-            setStudentDetailId(null);
-            const sp = new URLSearchParams(searchParams.toString());
-            if (sp.has("student")) {
-              sp.delete("student");
-              const q = sp.toString();
-              router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
-            }
-          }
-        }}
-        studentId={studentDetailId}
-        batches={batches}
-        onEdit={(st) => openEdit(st)}
-        onRenew={(st) => openRenew(st)}
-        onExtendTrial={(st) => setTrialExtendStudent(st)}
-        onConvertToPaid={(st) => setConvertTrialStudent(st)}
-        onBatchChange={(st) => openBatchChange(st)}
-        onLeave={(st) => openLeave(st)}
-        onDelete={(st) => openDelete(st)}
       />
       <TrialExtendDialog
         open={!!trialExtendStudent}

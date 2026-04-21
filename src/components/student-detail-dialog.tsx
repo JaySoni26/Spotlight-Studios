@@ -13,6 +13,7 @@ import { batchAccentColor, trialEnrollmentChipStyles } from "@/lib/chart-palette
 import { ArrowRightLeft, CalendarCheck, CalendarPlus, CalendarOff, Pencil, Trash2, Phone } from "lucide-react";
 import { LeaveHistoryList } from "@/components/student-leave-dialog";
 import { StudentDetailSkeleton } from "@/components/detail-sheet-skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 function statusBadgeVariant(status: { key: string; label: string }) {
   if (status.key === "expired") return "danger" as const;
@@ -58,6 +59,7 @@ export function StudentDetailDialog({
 }: StudentDetailDialogProps) {
   const [student, setStudent] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(false);
+  const [savingPaymentId, setSavingPaymentId] = React.useState<string | null>(null);
 
   const loadStudent = React.useCallback(() => {
     if (!studentId) return;
@@ -84,6 +86,35 @@ export function StudentDetailDialog({
   const status = student ? getStatus(student.end_date) : null;
   const showSkeleton = loading || !student;
   const accent = student ? batchAccentColor(student.batch_id, batches) : "hsl(var(--primary))";
+  const payments = student?.payments || [];
+  const positivePayments = payments.filter((p: any) => (p.amount || 0) > 0);
+  const refundPayments = payments.filter((p: any) => (p.amount || 0) < 0);
+  const cashTotal = positivePayments
+    .filter((p: any) => (p.payment_method || "cash") === "cash")
+    .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+  const onlineTotal = positivePayments
+    .filter((p: any) => (p.payment_method || "cash") === "online")
+    .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+
+  const updatePaymentMode = async (transactionId: string, payment_method: "cash" | "online") => {
+    setSavingPaymentId(transactionId);
+    try {
+      const updated: any = await api.updateTransaction(transactionId, { payment_method });
+      setStudent((prev: any) =>
+        prev
+          ? {
+              ...prev,
+              payments: (prev.payments || []).map((p: any) => (p.id === transactionId ? { ...p, payment_method: updated.payment_method } : p)),
+            }
+          : prev,
+      );
+      toast.success("Payment mode updated");
+    } catch (e: any) {
+      toast.error(e.message || "Could not update payment mode");
+    } finally {
+      setSavingPaymentId(null);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -183,6 +214,66 @@ export function StudentDetailDialog({
                   <p className="mt-1.5 text-[15px] leading-relaxed text-foreground/90">{student.notes}</p>
                 </div>
               )}
+              <div className="rounded-xl border border-border/50 bg-muted/20 px-3.5 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-[13px] font-medium text-muted-foreground">Payment history</p>
+                  <span className="text-[11px] text-muted-foreground">{payments.length} entries</span>
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                  <div className="rounded-lg border border-border/50 bg-background/70 px-2.5 py-2">
+                    <p className="text-muted-foreground">Cash collected</p>
+                    <p className="mt-0.5 font-semibold tabular-nums">₹{fmtINR(cashTotal)}</p>
+                  </div>
+                  <div className="rounded-lg border border-border/50 bg-background/70 px-2.5 py-2">
+                    <p className="text-muted-foreground">Online collected</p>
+                    <p className="mt-0.5 font-semibold tabular-nums">₹{fmtINR(onlineTotal)}</p>
+                  </div>
+                </div>
+                {(positivePayments.length > 0 || refundPayments.length > 0) ? (
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    {positivePayments.length} payment{positivePayments.length === 1 ? "" : "s"} · {refundPayments.length} refund{refundPayments.length === 1 ? "" : "s"}
+                  </p>
+                ) : null}
+                <div className="mt-3 space-y-2">
+                  {payments.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No payment entries yet.</p>
+                  ) : (
+                    payments.map((p: any) => (
+                      <div key={p.id} className="rounded-lg border border-border/50 bg-background/70 px-3 py-2.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold capitalize">{String(p.action).replaceAll("_", " ")}</p>
+                            <p className="text-[11px] text-muted-foreground">{new Date(p.created_at).toLocaleString()}</p>
+                          </div>
+                          <p className={`shrink-0 text-sm font-semibold tabular-nums ${p.amount < 0 ? "text-destructive" : "text-foreground"}`}>
+                            {p.amount < 0 ? "-" : "+"}₹{fmtINR(Math.abs(p.amount || 0))}
+                          </p>
+                        </div>
+                        {p.amount > 0 ? (
+                          <div className="mt-2 flex items-center justify-between gap-2">
+                            <span className="text-[11px] text-muted-foreground">Payment mode</span>
+                            <div className="w-28">
+                              <Select
+                                value={p.payment_method || "cash"}
+                                onValueChange={(v: "cash" | "online") => updatePaymentMode(p.id, v)}
+                                disabled={savingPaymentId === p.id}
+                              >
+                                <SelectTrigger className="h-8 text-xs">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="cash">Cash</SelectItem>
+                                  <SelectItem value="online">Online</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
               <LeaveHistoryList leaves={student.leaves} studentId={student.id} onChanged={loadStudent} />
               <p className="text-xs text-muted-foreground/90">ID · {student.id.slice(0, 8)}…</p>
             </div>
