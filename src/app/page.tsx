@@ -262,7 +262,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [moneyDetailOpen, setMoneyDetailOpen] = React.useState(false);
-  const [moneyScope, setMoneyScope] = React.useState<"combined_all" | "combined_month" | "studio_month" | "freelance_month" | null>(null);
+  const [moneyScope, setMoneyScope] = React.useState<"combined_all" | "combined_month" | "studio_month" | "freelance_month" | "cash" | "online" | null>(null);
   const [moneyPage, setMoneyPage] = React.useState(1);
   const [moneyLoading, setMoneyLoading] = React.useState(false);
   const [moneyBreakdown, setMoneyBreakdown] = React.useState<any>(null);
@@ -315,7 +315,11 @@ export default function DashboardPage() {
         ? "This month revenue breakdown"
         : moneyScope === "studio_month"
           ? "Studio (month) breakdown"
-          : "Freelance (month) breakdown";
+          : moneyScope === "freelance_month"
+            ? "Freelance (month) breakdown"
+            : moneyScope === "cash"
+              ? "Cash payment list"
+              : "Online payment list";
   const moneyRows = moneyBreakdown?.rows ?? [];
   const moneyTotal = moneyBreakdown?.totals?.combined ?? 0;
   const totalCount = moneyBreakdown?.total_count ?? 0;
@@ -537,6 +541,46 @@ export default function DashboardPage() {
           <ChartCard title="Validity" description="Time left on memberships.">
             <ValidityBarChart data={validityDistribution} />
           </ChartCard>
+        </div>
+      </section>
+
+      <section className="space-y-4 md:space-y-5">
+        <SectionHeading
+          eyebrow="Payments"
+          title="Cash vs online"
+          description="Collection split by payment mode. Tap a row to see each entry."
+        />
+        <div className="rounded-2xl border border-border/60 bg-card p-3 sm:p-4">
+          <button
+            type="button"
+            onClick={() => {
+              setMoneyScope("cash");
+              setMoneyPage(1);
+              setMoneyDetailOpen(true);
+            }}
+            className="flex w-full items-center justify-between rounded-xl border border-border/50 bg-muted/20 px-4 py-3 text-left hover:bg-muted/35"
+          >
+            <div>
+              <p className="text-sm font-semibold">Cash</p>
+              <p className="text-xs text-muted-foreground">{kpis.cashCount || 0} transactions</p>
+            </div>
+            <p className="text-lg font-semibold tabular-nums">₹{fmtINR(kpis.cashPaid || 0)}</p>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMoneyScope("online");
+              setMoneyPage(1);
+              setMoneyDetailOpen(true);
+            }}
+            className="mt-2 flex w-full items-center justify-between rounded-xl border border-border/50 bg-muted/20 px-4 py-3 text-left hover:bg-muted/35"
+          >
+            <div>
+              <p className="text-sm font-semibold">Online</p>
+              <p className="text-xs text-muted-foreground">{kpis.onlineCount || 0} transactions</p>
+            </div>
+            <p className="text-lg font-semibold tabular-nums">₹{fmtINR(kpis.onlinePaid || 0)}</p>
+          </button>
         </div>
       </section>
 

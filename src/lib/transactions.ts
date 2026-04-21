@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { type DbClient } from "@/lib/db";
 
-type PaymentMethod = "cash" | "upi" | "card" | "bank_transfer" | "other";
+type PaymentMethod = "cash" | "online";
 
 export async function logStudentTransaction(
   d: DbClient,

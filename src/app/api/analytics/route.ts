@@ -62,6 +62,15 @@ async function computeAnalytics(): Promise<NextResponse> {
   const freelanceRevenue = freelance.reduce((a, g) => a + (g.amount || 0), 0);
   const combinedRevenue = totalRevenue + freelanceRevenue;
   const avgFee = totalStudents > 0 ? Math.round(totalRevenue / totalStudents) : 0;
+  const paidTransactions = transactions.filter((t) => (t.amount || 0) > 0);
+  const cashPaid = paidTransactions
+    .filter((t) => (t.payment_method || "cash") === "cash")
+    .reduce((a, t) => a + (t.amount || 0), 0);
+  const onlinePaid = paidTransactions
+    .filter((t) => (t.payment_method || "cash") === "online")
+    .reduce((a, t) => a + (t.amount || 0), 0);
+  const cashCount = paidTransactions.filter((t) => (t.payment_method || "cash") === "cash").length;
+  const onlineCount = paidTransactions.filter((t) => (t.payment_method || "cash") === "online").length;
 
   // This month / last month revenue (from transaction ledger)
   const thisMonthStart = startOfMonth(now);
@@ -254,6 +263,10 @@ async function computeAnalytics(): Promise<NextResponse> {
       avgFreelanceAmount: freelance.length ? Math.round(freelanceRevenue / freelance.length) : 0,
       trialsActive,
       trialsExpired,
+      cashPaid,
+      onlinePaid,
+      cashCount,
+      onlineCount,
     },
     monthlyRevenue,
     enrolmentTrend,

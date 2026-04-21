@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const PaymentMethod = z.enum(["cash", "upi", "card", "bank_transfer", "other"]);
+export const PaymentMethod = z.enum(["cash", "online"]);
 
 export const Weekday = z.enum(["mon", "tue", "wed", "thu", "fri", "sat", "sun"]);
 

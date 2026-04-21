@@ -5,10 +5,10 @@ import { endOfMonth, format, startOfMonth } from "date-fns";
 
 export const dynamic = "force-dynamic";
 
-type Scope = "combined_all" | "combined_month" | "studio_month" | "freelance_month";
+type Scope = "combined_all" | "combined_month" | "studio_month" | "freelance_month" | "cash" | "online";
 
 function asScope(v: string | null): Scope {
-  if (v === "combined_month" || v === "studio_month" || v === "freelance_month") return v;
+  if (v === "combined_month" || v === "studio_month" || v === "freelance_month" || v === "cash" || v === "online") return v;
   return "combined_all";
 }
 
@@ -29,6 +29,20 @@ function buildWhere(scope: Scope) {
       txWhere: "WHERE created_at BETWEEN ? AND ?",
       gigWhere: "WHERE 1=0",
       args: [from, to],
+    };
+  }
+  if (scope === "cash") {
+    return {
+      txWhere: "WHERE amount > 0 AND COALESCE(payment_method, 'cash') = 'cash'",
+      gigWhere: "WHERE 1=0",
+      args: [] as any[],
+    };
+  }
+  if (scope === "online") {
+    return {
+      txWhere: "WHERE amount > 0 AND COALESCE(payment_method, 'cash') = 'online'",
+      gigWhere: "WHERE 1=0",
+      args: [] as any[],
     };
   }
   return {

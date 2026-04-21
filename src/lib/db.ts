@@ -243,6 +243,21 @@ async function migrate(d: DbClient) {
   if (!deleteEventCols.some((c) => c.name === "deleted_payload")) {
     await d.exec("ALTER TABLE delete_events ADD COLUMN deleted_payload TEXT");
   }
+  await d.exec(`
+    UPDATE transaction_events
+    SET payment_method = 'online'
+    WHERE LOWER(COALESCE(payment_method, '')) IN ('upi', 'card', 'bank_transfer', 'other');
+  `);
+  await d.exec(`
+    UPDATE transaction_events
+    SET payment_method = 'cash'
+    WHERE amount > 0 AND (payment_method IS NULL OR TRIM(payment_method) = '');
+  `);
+  await d.exec(`
+    UPDATE transaction_events
+    SET payment_method = 'online'
+    WHERE LOWER(COALESCE(payment_method, '')) NOT IN ('cash', 'online') AND amount > 0;
+  `);
 }
 
 // Row types
